@@ -17,7 +17,7 @@ ADD COLUMN isVerified BOOLEAN DEFAULT false;
 `;
 
 connection.query(alterPatientsAuthTable, (err) => {
-  if (err) {
+  if (err && err.code !== 'ER_DUP_FIELDNAME') {
     console.error('Error altering patients_auth table:', err);
   }
 });
