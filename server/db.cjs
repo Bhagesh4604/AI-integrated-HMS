@@ -12,8 +12,8 @@ const connection = mysql.createConnection({
 // For this project, we will add the table creation here.
 const alterPatientsAuthTable = `
 ALTER TABLE patients_auth
-ADD COLUMN IF NOT EXISTS verificationToken VARCHAR(255),
-ADD COLUMN IF NOT EXISTS isVerified BOOLEAN DEFAULT false;
+ADD COLUMN verificationToken VARCHAR(255),
+ADD COLUMN isVerified BOOLEAN DEFAULT false;
 `;
 
 connection.query(alterPatientsAuthTable, (err) => {
