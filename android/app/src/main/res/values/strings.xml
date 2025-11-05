@@ -1,8 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Shree Medicare HMS</string>
-    <string name="title_activity_main">Shree Medicare HMS</string>
-    <string name="package_name">com.hms.app</string>
-    <string name="custom_url_scheme">com.hms.app</string>
-    <string name="server_client_id">306870921505-nko2s0nroigmi8h0q6njusqacpiif7ul.apps.googleusercontent.com</string>
+    <string name="app_name">ShreeMedicare</string>
+    <string name="title_activity_main">ShreeMedicare</string>
+    <string name="package_name">com.example.app</string>
+    <string name="custom_url_scheme">com.example.app</string>
 </resources>

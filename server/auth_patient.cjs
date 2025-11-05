@@ -10,45 +10,80 @@ router.post('/register', async (req, res) => {
 
     // Strict email format validation
     const { valid, reason, validators } = await deepEmailValidator.validate(email);
-    console.log('Email validation result:', { valid, reason, validators });
     if (!valid) {
         return res.status(400).json({ success: false, message: 'Invalid email format.', reason: reason });
     }
 
-    const patientId = `PAT${Math.floor(1000 + Math.random() * 9000)}`;
-    const patientSql = `INSERT INTO patients (patientId, firstName, lastName, email, status) VALUES (?, ?, ?, ?, 'active')`;
-    
-    executeQuery(patientSql, [patientId, firstName, lastName, email], (err, result) => {
-        if (err) {
-            if (err.code === 'ER_DUP_ENTRY') {
-                return res.status(400).json({ success: false, message: 'A patient with this email already exists.' });
-            }
-            return res.status(500).json({ success: false, message: 'Failed to create patient record.' });
-        }
-
-        const newPatientId = result.insertId;
-        const verificationToken = crypto.randomBytes(20).toString('hex');
-
-        bcrypt.hash(password, 10, (err, hash) => {
-            if (err) return res.status(500).json({ success: false, message: 'Error hashing password.' });
-            
-            const authSql = 'INSERT INTO patients_auth (patientId, email, password, verificationToken, isVerified) VALUES (?, ?, ?, ?, ?)';
-            executeQuery(authSql, [newPatientId, email, hash, verificationToken, false], (authErr, authResult) => {
-                if (authErr) {
-                     console.error('Error creating login credentials:', authErr);
-                     if (authErr.code === 'ER_DUP_ENTRY') {
-                        return res.status(400).json({ success: false, message: 'This email is already registered for login.' });
-                     }
-                    return res.status(500).json({ success: false, message: 'Failed to create login credentials.' });
-                }
-
-                const verificationLink = `http://localhost:5173/verify-email?token=${verificationToken}`;
-                console.log('Verification link:', verificationLink);
-
-                res.json({ success: true, message: 'Patient registered successfully! A verification link has been logged to the server console.' });
-            });
+    const connection = await new Promise((resolve, reject) => {
+        const { pool } = require('./db.cjs');
+        pool.getConnection((err, connection) => {
+            if (err) return reject(err);
+            resolve(connection);
         });
     });
+
+    try {
+        await new Promise((resolve, reject) => {
+            connection.beginTransaction(err => {
+                if (err) return reject(err);
+                resolve();
+            });
+        });
+
+        const patientId = `PAT${Math.floor(1000 + Math.random() * 9000)}`;
+        const patientSql = `INSERT INTO patients (patientId, firstName, lastName, email, status) VALUES (?, ?, ?, ?, 'active')`;
+        const patientResult = await new Promise((resolve, reject) => {
+            connection.query(patientSql, [patientId, firstName, lastName, email], (err, result) => {
+                if (err) return reject(err);
+                resolve(result);
+            });
+        });
+
+        const newPatientId = patientResult.insertId;
+        const verificationToken = crypto.randomBytes(20).toString('hex');
+        const hash = await new Promise((resolve, reject) => {
+            bcrypt.hash(password, 10, (err, hash) => {
+                if (err) return reject(err);
+                resolve(hash);
+            });
+        });
+
+        const authSql = 'INSERT INTO patients_auth (patientId, email, password, verificationToken, isVerified) VALUES (?, ?, ?, ?, ?)';
+        await new Promise((resolve, reject) => {
+            connection.query(authSql, [newPatientId, email, hash, verificationToken, false], (err, result) => {
+                if (err) return reject(err);
+                resolve(result);
+            });
+        });
+
+        await new Promise((resolve, reject) => {
+            connection.commit(err => {
+                if (err) return reject(err);
+                resolve();
+            });
+        });
+
+        const verificationLink = `http://localhost:5173/verify-email?token=${verificationToken}`;
+        console.log('Verification link:', verificationLink);
+
+        res.json({ success: true, message: 'Patient registered successfully! A verification link has been logged to the server console.' });
+
+    } catch (err) {
+        await new Promise((resolve, reject) => {
+            connection.rollback(() => {
+                resolve();
+            });
+        });
+
+        if (err.code === 'ER_DUP_ENTRY') {
+            return res.status(400).json({ success: false, message: 'A patient with this email already exists.' });
+        }
+        console.error('Registration error:', err);
+        res.status(500).json({ success: false, message: 'Failed to register patient.' });
+
+    } finally {
+        if (connection) connection.release();
+    }
 });
 
 

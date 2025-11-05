@@ -1,8 +1,8 @@
 apply plugin: 'com.android.application'
 
 android {
+    compileSdk 35
     namespace "com.hms.app"
-    compileSdk rootProject.ext.compileSdkVersion
     defaultConfig {
         applicationId "com.hms.app"
         minSdkVersion rootProject.ext.minSdkVersion

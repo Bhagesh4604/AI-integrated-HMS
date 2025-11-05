@@ -1,0 +1,34 @@
+Troubleshooting Summary for "error: invalid source release: 21"
+
+Problem:
+Android Studio build was failing with the error "error: invalid source release: 21", indicating a Java version mismatch.
+
+Troubleshooting Steps Taken:
+
+1.  Set Java Compatibility in `app/build.gradle`:
+    - Added `compileOptions` to set `sourceCompatibility` and `targetCompatibility` to `JavaVersion.VERSION_17`.
+
+2.  Set Java Home in `gradle.properties`:
+    - Added the `org.gradle.java.home` property to point to a JDK 17 installation.
+
+3.  Set Java Compatibility in root `build.gradle`:
+    - Added a `tasks.withType(JavaCompile)` block to set the Java compatibility for all sub-projects to both Java 17 and, later, Java 11.
+
+4.  Set `JAVA_HOME` Environment Variable:
+    - Attempted to set the `JAVA_HOME` environment variable directly in the command line before executing the build.
+
+5.  Modified `gradlew.bat`:
+    - Prepended a `set JAVA_HOME` command to the `gradlew.bat` file to force the use of a specific JDK.
+
+6.  Cleaned Build Cache:
+    - Ran `./gradlew clean`.
+    - Manually deleted the `build` and `.gradle` directories within the `android` folder.
+
+Outcome:
+None of the above steps resolved the issue. The build continued to fail with the same error, suggesting a system-level configuration is overriding the project-level settings.
+
+Final Recommendation:
+The issue is likely due to a system-level configuration. The recommended next steps are to:
+- Verify the exact installation path of the desired JDK.
+- Check system-wide environment variables, particularly `JAVA_HOME` and `PATH`.
+- Confirm the "Gradle JDK" setting within Android Studio's settings (`File` > `Settings` > `Build, Execution, Deployment` > `Build Tools` > `Gradle`).

@@ -42,6 +42,32 @@ router.post('/send', async (req, res) => {
     }
 });
 
+router.get('/summaries', (req, res) => {
+    const queries = {
+        patients: "SELECT COUNT(*) as total, SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active FROM patients",
+        beds: "SELECT COUNT(*) as total, SUM(CASE WHEN status = 'occupied' THEN 1 ELSE 0 END) as occupied FROM beds",
+        receivables: "SELECT SUM(amount) as totalCollection FROM accounts_receivable WHERE paymentStatus = 'paid'"
+    };
+
+    const promises = Object.values(queries).map(sql => {
+        return new Promise((resolve, reject) => {
+            executeQuery(sql, [], (err, results) => {
+                if (err) return reject(err);
+                resolve(results[0]);
+            });
+        });
+    });
+
+    Promise.all(promises)
+        .then(([patients, beds, receivables]) => {
+            res.json({ patients, beds, receivables });
+        })
+        .catch(err => {
+            console.error("Failed to fetch summaries:", err);
+            res.status(500).json({ success: false, message: 'Internal server error' });
+        });
+});
+
 // All other report routes remain the same...
 router.get('/report/patients', (req, res) => {
     const sql = "SELECT patientId, firstName, lastName, status FROM patients WHERE status = 'active' LIMIT 10";

@@ -48,3 +48,8 @@ This guide assumes that you have already copied the project to a new location.
     *   In Android Studio, wait for the project to sync.
     *   Connect your Android device to your computer or start an Android emulator.
     *   Click the "Run" button (the green triangle) in the Android Studio toolbar to build and run the app on your device or emulator.
+   
+
+
+
+   and main thisng to connect server is make sure url in .env and capacitor.config.json  these files it usually looks like  http://192.168.1.103:8080
