@@ -1,3 +1,5 @@
 node_modules
 .gradle
 .env
+.env.example
+project_summary.txt
