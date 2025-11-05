@@ -17,7 +17,7 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       rollupOptions: {
-        external: ['@capgo/capacitor-social-login', 'react-countup', '@hello-pangea/dnd']
+        external: ['@capgo/capacitor-social-login', 'react-countup', '@hello-pangea/dnd', 'framer-motion', 'lucide-react', 'react-router-dom']
       }
     }
   }
