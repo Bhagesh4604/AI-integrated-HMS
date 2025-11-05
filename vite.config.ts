@@ -17,7 +17,7 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       rollupOptions: {
-        external: ['@capgo/capacitor-social-login']
+        external: ['@capgo/capacitor-social-login', '@radix-ui/react-dialog', '@radix-ui/react-label', '@radix-ui/react-slot', 'clsx', 'framer-motion', 'lucide-react', 'react', 'react-dom', 'react-router-dom', 'tailwind-merge', 'tailwindcss-animate', 'react-countup', 'reaviz', '@hello-pangea/dnd']
       }
     }
   }
