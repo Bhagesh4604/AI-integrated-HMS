@@ -39,7 +39,8 @@
     "google-auth-library": "^10.5.0",
     "tailwindcss-animate": "^1.0.7",
     "react-countup": "^6.5.3",
-    "reaviz": "^16.1.0"
+    "reaviz": "^16.1.0",
+    "@hello-pangea/dnd": "^16.6.0"
   },
   "devDependencies": {
     "@types/react": "^18.3.5",

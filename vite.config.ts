@@ -17,11 +17,8 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       rollupOptions: {
-        external: ['@capgo/capacitor-social-login', '@hello-pangea/dnd']
+        external: ['@capgo/capacitor-social-login']
       }
-    },
-    optimizeDeps: {
-      include: ['@hello-pangea/dnd']
     }
   }
 });
