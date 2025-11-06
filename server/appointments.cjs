@@ -109,9 +109,10 @@ router.post('/book-by-doctor', (req, res) => {
         return res.status(400).json({ success: false, message: 'Cannot book an appointment in the past.' });
     }
 
+    const formattedAppointmentDate = new Date(appointmentDate).toISOString().slice(0, 19).replace('T', ' ');
     const sql = "INSERT INTO appointments (patientId, doctorId, appointmentDate, notes, status, consultationType) VALUES (?, ?, ?, ?, 'scheduled', ?)";
     
-    executeQuery(sql, [patientId, doctorId, appointmentDate, notes, consultationType], (err, result) => {
+    executeQuery(sql, [patientId, doctorId, formattedAppointmentDate, notes, consultationType], (err, result) => {
         if (err) {
             console.error("Error booking appointment by doctor:", err);
             return res.status(500).json({ success: false, message: 'Database error while booking appointment.' });

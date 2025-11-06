@@ -104,9 +104,10 @@ router.post('/book-appointment', async (req, res) => {
     try {
         // 1. Insert the appointment
         console.log("Step 1: Inserting appointment into database...");
+        const formattedAppointmentDate = new Date(appointmentDate).toISOString().slice(0, 19).replace('T', ' ');
         const result = await new Promise((resolve, reject) => {
             const sql = "INSERT INTO appointments (patientId, doctorId, appointmentDate, notes, status, consultationType) VALUES (?, ?, ?, ?, 'scheduled', ?)";
-            executeQuery(sql, [patientId, doctorId, appointmentDate, notes, consultationType], (err, result) => {
+            executeQuery(sql, [patientId, doctorId, formattedAppointmentDate, notes, consultationType], (err, result) => {
                 if (err) return reject(err);
                 resolve(result);
             });
