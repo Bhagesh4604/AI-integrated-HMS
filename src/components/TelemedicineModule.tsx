@@ -48,19 +48,17 @@ export default function TelemedicineModule({ user }) {
     const [patients, setPatients] = useState([]);
     const [doctors, setDoctors] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
-    const [modal, setModal] = useState(null); // 'bookVirtual', 'view', 'join', 'prescribe', 'message', 'history'
+    const [modal, setModal] = useState(null);
     const [selectedAppointment, setSelectedAppointment] = useState(null);
     const [showHistoryModal, setShowHistoryModal] = useState(false);
 
-    // State for booking virtual appointments
-    const [newVirtualAppointment, setNewVirtualAppointment] = useState({ patientId: '', appointmentDate: '', notes: '', consultationType: 'virtual' });
+    const [newVirtualAppointment, setNewVirtualAppointment] = useState({ patientId: '', notes: '', consultationType: 'virtual' });
+    const [bookingDate, setBookingDate] = useState('');
+    const [bookingSlot, setBookingSlot] = useState('');
     const [availableSlots, setAvailableSlots] = useState([]);
     const [slotsLoading, setSlotsLoading] = useState(false);
 
-    // State for E-Prescribing
     const [newPrescription, setNewPrescription] = useState({ notes: '' });
-
-    // State for Secure messaging
     const [newMessage, setNewMessage] = useState({ message: '' });
 
     useEffect(() => {
@@ -69,13 +67,11 @@ export default function TelemedicineModule({ user }) {
         fetchDoctors();
     }, []);
 
-    // Effect to fetch available slots when the date part of appointmentDate changes
     useEffect(() => {
-        const date = newVirtualAppointment.appointmentDate.split('T')[0];
-        if (user.id && date) {
-            fetchAvailableSlots(user.id, date);
+        if (user.id && bookingDate) {
+            fetchAvailableSlots(user.id, bookingDate);
         }
-    }, [user.id, newVirtualAppointment.appointmentDate.split('T')[0]]);
+    }, [user.id, bookingDate]);
 
     const fetchVirtualAppointments = async () => {
         try {
@@ -120,17 +116,15 @@ export default function TelemedicineModule({ user }) {
     const handleNewVirtualAppointmentChange = (e) => {
         const { name, value } = e.target;
         if (name === 'appointmentDate') {
-            const currentDate = newVirtualAppointment.appointmentDate.split('T')[0];
-            if (currentDate !== value) {
-                setNewVirtualAppointment(prev => ({ ...prev, [name]: value, time: '' }));
-            }
+            setBookingDate(value);
+            setBookingSlot('');
         } else {
             setNewVirtualAppointment(prev => ({ ...prev, [name]: value }));
         }
     };
 
     const handleTimeSlotSelect = (slot) => {
-        setNewVirtualAppointment(prev => ({ ...prev, appointmentDate: slot }));
+        setBookingSlot(slot);
     };
 
     const handleBookVirtualAppointment = async (e) => {
@@ -159,7 +153,7 @@ export default function TelemedicineModule({ user }) {
             if (data.success) {
                 setModal(null);
                 fetchVirtualAppointments();
-                setNewVirtualAppointment({ patientId: '', appointmentDate: '', notes: '', consultationType: 'virtual' });
+                setNewVirtualAppointment({ patientId: '', notes: '', consultationType: 'virtual' });
                 setBookingDate('');
                 setBookingSlot('');
                 setAvailableSlots([]);
@@ -174,14 +168,12 @@ export default function TelemedicineModule({ user }) {
     };
 
     const handleJoinConsultation = async (appointment) => {
-        console.log('Joining consultation for patientId:', appointment.patientId);
-        // In a real app, this would fetch the room URL from your backend's virtual_consultation_rooms table
         try {
             const response = await fetch(apiUrl(`/api/virtual-consultations/appointment/${appointment.id}`));
             const data = await response.json();
 
             if (data && data.success && data.room && data.room.roomUrl) {
-                 window.open(data.room.roomUrl, '_blank'); // Open in new tab
+                 window.open(data.room.roomUrl, '_blank');
             } else {
                 alert('Virtual room details not found for this appointment. Please ensure it was created.');
             }
@@ -199,15 +191,14 @@ export default function TelemedicineModule({ user }) {
     const handleEPrescribe = async (e) => {
         e.preventDefault();
         if (!selectedAppointment) return;
-        console.log('Sending patientId for E-Prescribe:', selectedAppointment.patientId);
         try {
-            const response = await fetch(apiUrl('/api/medical-records/add'), { // Reusing medical records add
+            const response = await fetch(apiUrl('/api/medical-records/add'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     patientId: selectedAppointment.patientId, 
                     doctorId: user.id, 
-                    recordDate: new Date().toISOString().split('T')[0], // Today's date
+                    recordDate: new Date().toISOString().split('T')[0],
                     diagnosis: 'Virtual Consultation E-Prescription', 
                     treatment: `Issued during virtual consult: ID ${selectedAppointment.id}`,
                     prescriptionNotes: newPrescription.notes 
@@ -353,7 +344,7 @@ export default function TelemedicineModule({ user }) {
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-400 mb-1">Date</label>
-                            <input type="date" name="appointmentDate" value={newVirtualAppointment.appointmentDate.split('T')[0]} onChange={handleNewVirtualAppointmentChange} min={new Date().toISOString().split('T')[0]} className="w-full p-2 bg-gray-800 border-gray-700 text-white rounded-lg" required />
+                            <input type="date" name="appointmentDate" value={bookingDate} onChange={handleNewVirtualAppointmentChange} min={new Date().toISOString().split('T')[0]} className="w-full p-2 bg-gray-800 border-gray-700 text-white rounded-lg" required />
                         </div>
 
                         {slotsLoading && <p className="text-center text-gray-400">Loading slots...</p>}
@@ -366,7 +357,7 @@ export default function TelemedicineModule({ user }) {
                                             type="button"
                                             key={slot}
                                             onClick={() => handleTimeSlotSelect(slot)}
-                                            className={`p-2 rounded-lg text-sm text-center ${newVirtualAppointment.appointmentDate === slot ? 'bg-blue-600 text-white' : 'bg-gray-700 hover:bg-gray-600'}`}>
+                                            className={`p-2 rounded-lg text-sm text-center ${bookingSlot === slot ? 'bg-blue-600 text-white' : 'bg-gray-700 hover:bg-gray-600'}`}>
                                             {new Date(slot).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                         </button>
                                     ))}
@@ -374,7 +365,7 @@ export default function TelemedicineModule({ user }) {
                             </div>
                         )}
 
-                        {!slotsLoading && availableSlots.length === 0 && newVirtualAppointment.appointmentDate && (
+                        {!slotsLoading && availableSlots.length === 0 && bookingDate && (
                             <p className="text-center text-gray-400">No available slots for this date.</p>
                         )}
 
@@ -391,7 +382,7 @@ export default function TelemedicineModule({ user }) {
                         </div>
                         <div className="flex justify-end gap-4 pt-6 mt-4 border-t border-gray-800">
                             <button type="button" onClick={() => setModal(null)} className="px-6 py-2 bg-gray-700 rounded-lg font-semibold hover:bg-gray-600">Cancel</button>
-                            <button type="submit" className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700">Schedule Consult</button>
+                            <button type="submit" disabled={!bookingSlot} className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-500">Schedule Consult</button>
                         </div>
                     </form>
                 </Modal>
