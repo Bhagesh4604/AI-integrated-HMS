@@ -9,11 +9,7 @@ const generateRoomUrl = (appointmentId) => {
     return `https://meet.jit.si/${roomName}`;
 };
 
-// Helper to generate a unique room URL (copied from virtualConsultations.cjs)
-const generateRoomUrl = (appointmentId) => {
-    const roomName = `HMSConsultation-${appointmentId}-${Date.now()}`;
-    return `https://meet.jit.si/${roomName}`;
-};
+
 
 // Get prescriptions for a specific patient
 router.get('/my-prescriptions/:patientId', async (req, res) => {
