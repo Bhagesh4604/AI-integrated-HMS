@@ -135,47 +135,37 @@ export default function TelemedicineModule({ user }) {
 
     const handleBookVirtualAppointment = async (e) => {
         e.preventDefault();
+        if (!bookingSlot) {
+            alert("Please select an available time slot.");
+            return;
+        }
 
-        const formattedDate = new Date(newVirtualAppointment.appointmentDate).toISOString().slice(0, 19).replace('T', ' ');
+        const appointmentData = {
+            ...newVirtualAppointment,
+            patientId: newVirtualAppointment.patientId,
+            doctorId: user.id,
+            appointmentDate: bookingSlot,
+        };
 
-        console.log("New virtual appointment state:", newVirtualAppointment);
-        console.log("Booking virtual appointment with data:", { ...newVirtualAppointment, appointmentDate: formattedDate, doctorId: user.id });
         try {
-            // 1. Book the appointment
-            const apptResponse = await fetch(apiUrl('/api/appointments/book-by-doctor'), {
+            const response = await fetch(apiUrl('/api/portal/book-appointment'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...newVirtualAppointment, appointmentDate: formattedDate, doctorId: user.id }),
+                body: JSON.stringify(appointmentData),
             });
-            const apptData = await apptResponse.json();
-            console.log("Appointment booking response:", apptData);
 
-            if (apptData.success) {
-                const appointmentId = apptData.id; // Backend should return the new appointment ID
+            const data = await response.json();
 
-                // 2. Create the virtual room
-                const roomResponse = await fetch(apiUrl('/api/virtual-consultations/create'), {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        appointmentId: appointmentId,
-                        startTime: newVirtualAppointment.appointmentDate, // This is the full ISO string with time
-                        endTime: new Date(new Date(newVirtualAppointment.appointmentDate).getTime() + 30 * 60 * 1000).toISOString(), // Assuming 30 min consult
-                    }),
-                });
-                const roomData = await roomResponse.json();
-                console.log("Room creation response:", roomData);
-
-                if (roomData.success) {
-                    setModal(null);
-                    fetchVirtualAppointments();
-                    setNewVirtualAppointment({ patientId: '', appointmentDate: '', notes: '' });
-                    alert('Virtual consultation scheduled and room created successfully!');
-                } else {
-                    alert(roomData.message || 'Failed to create virtual room.');
-                }
+            if (data.success) {
+                setModal(null);
+                fetchVirtualAppointments();
+                setNewVirtualAppointment({ patientId: '', appointmentDate: '', notes: '', consultationType: 'virtual' });
+                setBookingDate('');
+                setBookingSlot('');
+                setAvailableSlots([]);
+                alert('Virtual consultation scheduled successfully!');
             } else {
-                alert(apptData.message || 'Failed to schedule virtual appointment.');
+                alert(data.message || 'Failed to schedule virtual appointment.');
             }
         } catch (error) {
             console.error('Error booking virtual appointment:', error);
