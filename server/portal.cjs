@@ -96,6 +96,10 @@ router.put('/my-appointments/:appointmentId/cancel', (req, res) => {
 router.post('/book-appointment', async (req, res) => {
     const { patientId, doctorId, appointmentDate, notes, consultationType } = req.body;
     
+    if (new Date(appointmentDate) < new Date()) {
+        return res.status(400).json({ success: false, message: 'Cannot book an appointment in the past.' });
+    }
+
     try {
         // 1. Insert the appointment
         const result = await new Promise((resolve, reject) => {
