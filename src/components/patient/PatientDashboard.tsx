@@ -603,7 +603,7 @@ ${result.result_text}
 
                                 <div>
                                     <label className="block text-xs font-medium text-gray-400 mb-1">Date</label>
-                                    <input type="date" name="appointmentDate" value={bookingDate} onChange={(e) => { setBookingDate(e.target.value); setBookingSlot(''); }} className="w-full p-2 bg-gray-800 border-gray-700 text-white rounded-lg text-sm" required />
+                                    <input type="date" name="appointmentDate" value={bookingDate} onChange={(e) => { setBookingDate(e.target.value); setBookingSlot(''); }} min={new Date().toISOString().split('T')[0]} className="w-full p-2 bg-gray-800 border-gray-700 text-white rounded-lg text-sm" required />
                                 </div>
 
                                 {availableSlots.length > 0 && (

@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const { executeQuery } = require('./db.cjs');
+const { pool, executeQuery } = require('./db.cjs');
 const bcrypt = require('bcryptjs');
 const deepEmailValidator = require('deep-email-validator');
+const crypto = require('crypto');
 
 // Patient Registration
 router.post('/register', async (req, res) => {
@@ -14,15 +15,15 @@ router.post('/register', async (req, res) => {
         return res.status(400).json({ success: false, message: 'Invalid email format.', reason: reason });
     }
 
-    const connection = await new Promise((resolve, reject) => {
-        const { pool } = require('./db.cjs');
-        pool.getConnection((err, connection) => {
-            if (err) return reject(err);
-            resolve(connection);
-        });
-    });
-
+    let connection;
     try {
+        connection = await new Promise((resolve, reject) => {
+            pool.getConnection((err, conn) => {
+                if (err) return reject(err);
+                resolve(conn);
+            });
+        });
+
         await new Promise((resolve, reject) => {
             connection.beginTransaction(err => {
                 if (err) return reject(err);
@@ -41,12 +42,7 @@ router.post('/register', async (req, res) => {
 
         const newPatientId = patientResult.insertId;
         const verificationToken = crypto.randomBytes(20).toString('hex');
-        const hash = await new Promise((resolve, reject) => {
-            bcrypt.hash(password, 10, (err, hash) => {
-                if (err) return reject(err);
-                resolve(hash);
-            });
-        });
+        const hash = await bcrypt.hash(password, 10);
 
         const authSql = 'INSERT INTO patients_auth (patientId, email, password, verificationToken, isVerified) VALUES (?, ?, ?, ?, ?)';
         await new Promise((resolve, reject) => {
@@ -63,17 +59,15 @@ router.post('/register', async (req, res) => {
             });
         });
 
-        const verificationLink = `http://localhost:5173/verify-email?token=${verificationToken}`;
+        const verificationLink = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
         console.log('Verification link:', verificationLink);
 
         res.json({ success: true, message: 'Patient registered successfully! A verification link has been logged to the server console.' });
 
     } catch (err) {
-        await new Promise((resolve, reject) => {
-            connection.rollback(() => {
-                resolve();
-            });
-        });
+        if (connection) {
+            await new Promise(resolve => connection.rollback(() => resolve()));
+        }
 
         if (err.code === 'ER_DUP_ENTRY') {
             return res.status(400).json({ success: false, message: 'A patient with this email already exists.' });
@@ -88,7 +82,6 @@ router.post('/register', async (req, res) => {
 
 
 const { sendPasswordResetEmail } = require('./email.cjs');
-const crypto = require('crypto');
 
 // Patient Login
 router.post('/login', (req, res) => {
@@ -107,7 +100,6 @@ router.post('/login', (req, res) => {
         }
 
         const user = results[0];
-        console.log('user.isVerified:', user.isVerified);
 
         if (!user.isVerified) {
             return res.status(401).json({ success: false, message: 'Please verify your email before logging in.' });
@@ -127,19 +119,16 @@ router.post('/login', (req, res) => {
                 return res.status(401).json({ success: false, message: 'Invalid credentials.' });
             }
 
-            // On successful match, fetch the full patient details
             const patientDetailsSql = 'SELECT * FROM patients WHERE id = ?';
             executeQuery(patientDetailsSql, [user.patientId], (patientErr, patientResults) => {
                 if (patientErr || patientResults.length === 0) {
                     return res.status(500).json({ success: false, message: 'Could not retrieve patient details after login.' });
                 }
                 
-                console.log('patient object:', patientResults[0]);
-
                 res.json({
                     success: true,
                     message: 'Login successful!',
-                    patient: patientResults[0] // Return the full patient object
+                    patient: patientResults[0]
                 });
             });
         });
@@ -165,7 +154,7 @@ router.post('/forgot-password', (req, res) => {
                 return res.status(500).json({ success: false, message: 'Failed to store password reset token.' });
             }
 
-            const resetLink = `http://localhost:5173/reset-password?token=${token}`;
+            const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
             console.log('Password reset link:', resetLink);
 
             res.json({ success: true, message: 'A password reset link has been logged to the server console.' });
@@ -212,7 +201,6 @@ router.post('/reset-password', (req, res) => {
 // Google Login
 router.post('/google-login', async (req, res) => {
     const { idToken } = req.body;
-    console.log('idToken:', idToken);
 
     try {
         const ticket = await client.verifyIdToken({
@@ -222,7 +210,6 @@ router.post('/google-login', async (req, res) => {
         const payload = ticket.getPayload();
         const { email, given_name, family_name, picture } = payload;
 
-        // Check if patient already exists
         const patientSql = 'SELECT * FROM patients WHERE email = ?';
         executeQuery(patientSql, [email], async (err, results) => {
             if (err) {
@@ -233,34 +220,32 @@ router.post('/google-login', async (req, res) => {
             let patient = results[0];
 
             if (!patient) {
-                // Patient does not exist, create new patient record
                 const patientId = `PAT${Math.floor(1000 + Math.random() * 9000)}`;
                 const insertPatientSql = 'INSERT INTO patients (patientId, firstName, lastName, email, profileImageUrl, status) VALUES (?, ?, ?, ?, ?, ?)';
-                await new Promise((resolve, reject) => {
-                    executeQuery(insertPatientSql, [patientId, given_name, family_name, email, picture, 'active'], (insertErr, insertResult) => {
+                const insertResult = await new Promise((resolve, reject) => {
+                    executeQuery(insertPatientSql, [patientId, given_name, family_name, email, picture, 'active'], (insertErr, result) => {
                         if (insertErr) return reject(insertErr);
-                        resolve(insertResult);
+                        resolve(result);
                     });
                 });
 
-                // Fetch the newly created patient
-                const newPatientSql = 'SELECT * FROM patients WHERE email = ?';
+                const newPatientId = insertResult.insertId;
+
+                const authSql = 'INSERT INTO patients_auth (patientId, email) VALUES (?, ?)';
+                await new Promise((resolve, reject) => {
+                    executeQuery(authSql, [newPatientId, email], (authErr, authResult) => {
+                        if (authErr) return reject(authErr);
+                        resolve(authResult);
+                    });
+                });
+
                 const newPatientResults = await new Promise((resolve, reject) => {
-                    executeQuery(newPatientSql, [email], (fetchErr, fetchResults) => {
+                    executeQuery(patientSql, [email], (fetchErr, fetchResults) => {
                         if (fetchErr) return reject(fetchErr);
                         resolve(fetchResults);
                     });
                 });
                 patient = newPatientResults[0];
-
-                // Also create an entry in patients_auth (without password)
-                const authSql = 'INSERT INTO patients_auth (patientId, email) VALUES (?, ?)';
-                await new Promise((resolve, reject) => {
-                    executeQuery(authSql, [patient.id, email], (authErr, authResult) => {
-                        if (authErr) return reject(authErr);
-                        resolve(authResult);
-                    });
-                });
             }
 
             res.json({ success: true, message: 'Google login successful!', patient: patient });
@@ -271,13 +256,6 @@ router.post('/google-login', async (req, res) => {
         res.status(401).json({ success: false, message: 'Google login failed. Invalid token.' });
     }
 });
-
-// POST to change a patient's password
-router.post('/change-password', (req, res) => {
-    // ... (your existing change password code)
-});
-
-module.exports = router;
 
 // Verify Email
 router.get('/verify-email', (req, res) => {
@@ -301,3 +279,5 @@ router.get('/verify-email', (req, res) => {
         });
     });
 });
+
+module.exports = router;

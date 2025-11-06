@@ -353,7 +353,7 @@ export default function TelemedicineModule({ user }) {
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-400 mb-1">Date</label>
-                            <input type="date" name="appointmentDate" value={newVirtualAppointment.appointmentDate.split('T')[0]} onChange={handleNewVirtualAppointmentChange} className="w-full p-2 bg-gray-800 border-gray-700 text-white rounded-lg" required />
+                            <input type="date" name="appointmentDate" value={newVirtualAppointment.appointmentDate.split('T')[0]} onChange={handleNewVirtualAppointmentChange} min={new Date().toISOString().split('T')[0]} className="w-full p-2 bg-gray-800 border-gray-700 text-white rounded-lg" required />
                         </div>
 
                         {slotsLoading && <p className="text-center text-gray-400">Loading slots...</p>}

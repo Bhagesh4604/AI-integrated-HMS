@@ -105,6 +105,10 @@ router.post('/book-by-doctor', (req, res) => {
         return res.status(400).json({ success: false, message: 'Patient, doctor, and date are required.' });
     }
 
+    if (new Date(appointmentDate) < new Date()) {
+        return res.status(400).json({ success: false, message: 'Cannot book an appointment in the past.' });
+    }
+
     const sql = "INSERT INTO appointments (patientId, doctorId, appointmentDate, notes, status, consultationType) VALUES (?, ?, ?, ?, 'scheduled', ?)";
     
     executeQuery(sql, [patientId, doctorId, appointmentDate, notes, consultationType], (err, result) => {

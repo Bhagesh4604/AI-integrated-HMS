@@ -124,6 +124,16 @@ function App() {
   const [loginType, setLoginType] = useState(null);
   const [patientAuthMode, setPatientAuthMode] = useState('login');
 
+  // --- TEMPORARY DEBUGGING CODE ---
+  const VITE_API_BASE_VALUE = import.meta.env.VITE_API_BASE;
+  const debugInfo = (
+    <div style={{ position: 'fixed', top: 0, left: 0, background: 'rgba(0,0,0,0.8)', color: 'white', padding: '10px', zIndex: 9999 }}>
+      <strong>Debugging Info:</strong>
+      <p>VITE_API_BASE: {VITE_API_BASE_VALUE || 'NOT SET'}</p>
+    </div>
+  );
+  // --- END TEMPORARY DEBUGGING CODE ---
+
   const handleLogin = (user) => {
     const userWithRole = user.role ? user : { ...user, role: 'patient' };
     setLoggedInUser(userWithRole);
@@ -144,7 +154,9 @@ function App() {
   };
 
   return (
-          <Routes>
+    <>
+      {debugInfo}
+      <Routes>
             <Route path="/reset-password" element={<ResetPassword setAuthMode={setPatientAuthMode} />} />
             <Route path="/verify-email" element={<VerifyEmail />} />      <Route path="/" element={(() => {
           if (!loggedInUser) {

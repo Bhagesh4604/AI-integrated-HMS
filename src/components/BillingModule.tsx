@@ -200,7 +200,7 @@ export default function BillingModule() {
         }
     };
 
-    const totalOutstanding = useMemo(() => bills.reduce((sum, bill) => sum + parseFloat(bill.balanceDue), 0), [bills]);
+    const totalOutstanding = useMemo(() => (bills || []).reduce((sum, bill) => sum + parseFloat(bill.balanceDue), 0) || 0, [bills]);
 
     const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.05 } } };
     const itemVariants = { hidden: { y: 20, opacity: 0 }, visible: { y: 0, opacity: 1 } };
