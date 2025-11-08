@@ -80,7 +80,7 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ success: false, message: 'A patient with this email already exists.' });
         }
         console.error('Registration error:', err);
-        res.status(500).json({ success: false, message: 'Failed to register patient.' });
+        res.status(500).json({ success: false, message: 'Failed to register patient.', details: err.message });
 
     } finally {
         if (connection) connection.release();
