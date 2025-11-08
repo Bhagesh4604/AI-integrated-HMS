@@ -37,6 +37,7 @@ router.post('/register', async (req, res) => {
         });
 
         const patientId = `PAT${Date.now()}${Math.floor(100 + Math.random() * 900)}`;
+        const patientSql = `INSERT INTO patients (patientId, firstName, lastName, email, phone, status) VALUES (?, ?, ?, ?, ?, 'active')`;
         const patientResult = await new Promise((resolve, reject) => {
             connection.query(patientSql, [patientId, firstName, lastName, email, contact], (err, result) => {
                 if (err) return reject(err);
@@ -80,7 +81,7 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ success: false, message: 'A patient with this email already exists.' });
         }
         console.error('Registration error:', err);
-        res.status(500).json({ success: false, message: 'Failed to register patient.', details: err.message });
+        res.status(500).json({ success: false, message: 'Failed to register patient.' });
 
     } finally {
         if (connection) connection.release();
