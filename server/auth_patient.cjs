@@ -47,6 +47,7 @@ router.post('/register', async (req, res) => {
 
         const newPatientId = patientResult.insertId;
         const verificationToken = crypto.randomBytes(20).toString('hex');
+        console.log('Token being saved to DB:', verificationToken);
         const hash = await bcrypt.hash(password, 10);
 
         const authSql = 'INSERT INTO patients_auth (patientId, email, password, verificationToken, isVerified) VALUES (?, ?, ?, ?, ?)';
@@ -79,7 +80,11 @@ router.post('/register', async (req, res) => {
             });
         });
 
-        res.json({ success: true, message: 'Patient registered successfully! A verification email and welcome SMS are being sent.' });
+        res.json({ 
+            success: true, 
+            message: 'Patient registered successfully! A verification email and welcome SMS are being sent.',
+            verificationToken: verificationToken 
+        });
 
     } catch (err) {
         if (connection) {
