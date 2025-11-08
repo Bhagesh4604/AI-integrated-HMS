@@ -46,13 +46,11 @@ router.post('/register', async (req, res) => {
         });
 
         const newPatientId = patientResult.insertId;
-        const verificationToken = crypto.randomBytes(20).toString('hex');
-        console.log('Token being saved to DB:', verificationToken);
         const hash = await bcrypt.hash(password, 10);
 
-        const authSql = 'INSERT INTO patients_auth (patientId, email, password, verificationToken, isVerified) VALUES (?, ?, ?, ?, ?)';
+        const authSql = 'INSERT INTO patients_auth (patientId, email, password, isVerified) VALUES (?, ?, ?, ?)';
         await new Promise((resolve, reject) => {
-            connection.query(authSql, [newPatientId, email, hash, verificationToken, false], (err, result) => {
+            connection.query(authSql, [newPatientId, email, hash, true], (err, result) => {
                 if (err) return reject(err);
                 resolve(result);
             });
@@ -65,25 +63,16 @@ router.post('/register', async (req, res) => {
             });
         });
 
-        // Send verification email and welcome SMS (fire and forget)
-        const { sendVerificationEmail } = require('./email.cjs');
+        // Send welcome SMS (fire and forget)
         const { sendSms } = require('./sms.cjs');
         
-        Promise.allSettled([
-            sendVerificationEmail(email, verificationToken),
-            sendSms(contact, 'Welcome to Shree Medicare! Your registration was successful.')
-        ]).then(results => {
-            results.forEach(result => {
-                if (result.status === 'rejected') {
-                    console.error("Failed to send email or SMS during registration:", result.reason);
-                }
-            });
+        sendSms(contact, 'Welcome to Shree Medicare! Your registration was successful.').catch(err => {
+            console.error("Failed to send SMS during registration:", err);
         });
 
         res.json({ 
             success: true, 
-            message: 'Patient registered successfully! A verification email and welcome SMS are being sent.',
-            verificationToken: verificationToken 
+            message: 'Patient registered successfully! A welcome SMS is being sent.'
         });
 
     } catch (err) {
@@ -101,67 +90,6 @@ router.post('/register', async (req, res) => {
         if (connection) connection.release();
     }
 });
-
-// Resend Verification Email
-router.post('/resend-verification', async (req, res) => {
-    const { email } = req.body;
-
-    if (!email) {
-        return res.status(400).json({ success: false, message: 'Email is required.' });
-    }
-
-    let connection;
-    try {
-        connection = await new Promise((resolve, reject) => {
-            pool.getConnection((err, conn) => {
-                if (err) return reject(err);
-                resolve(conn);
-            });
-        });
-
-        const findUserSql = 'SELECT * FROM patients_auth WHERE email = ?';
-        const users = await new Promise((resolve, reject) => {
-            connection.query(findUserSql, [email], (err, results) => {
-                if (err) return reject(err);
-                resolve(results);
-            });
-        });
-
-        if (users.length === 0) {
-            return res.status(404).json({ success: false, message: 'No patient found with this email address.' });
-        }
-
-        const user = users[0];
-
-        if (user.isVerified) {
-            return res.status(400).json({ success: false, message: 'This account is already verified.' });
-        }
-
-        const newVerificationToken = crypto.randomBytes(20).toString('hex');
-        const updateTokenSql = 'UPDATE patients_auth SET verificationToken = ? WHERE id = ?';
-        await new Promise((resolve, reject) => {
-            connection.query(updateTokenSql, [newVerificationToken, user.id], (err, result) => {
-                if (err) return reject(err);
-                resolve(result);
-            });
-        });
-
-        // Send the email (fire and forget)
-        const { sendVerificationEmail } = require('./email.cjs');
-        sendVerificationEmail(email, newVerificationToken).catch(err => {
-            console.error('Failed to resend verification email:', err);
-        });
-
-        res.json({ success: true, message: 'A new verification link is being sent to your email.' });
-
-    } catch (err) {
-        console.error('Resend verification error:', err);
-        res.status(500).json({ success: false, message: 'Failed to resend verification email.' });
-    } finally {
-        if (connection) connection.release();
-    }
-});
-
 
 const { sendPasswordResetEmail } = require('./email.cjs');
 
@@ -338,79 +266,6 @@ router.post('/google-login', async (req, res) => {
     } catch (error) {
         console.error('Google ID token verification failed:', error);
         res.status(401).json({ success: false, message: 'Google login failed. Invalid token.' });
-    }
-});
-
-// Verify Email
-router.get('/verify-email', async (req, res) => {
-    const { token } = req.query;
-    console.log('Backend: Received verification request for token:', token); // Added log
-
-    if (!token) {
-        console.log('Backend: Verification token is missing.'); // Added log
-        return res.status(400).json({ success: false, message: 'Verification token is missing.' });
-    }
-
-    let connection;
-    try {
-        connection = await new Promise((resolve, reject) => {
-            pool.getConnection((err, conn) => {
-                if (err) {
-                    console.error('Backend: Error getting DB connection for verification:', err); // Added log
-                    return reject(err);
-                }
-                resolve(conn);
-            });
-        });
-
-        const findUserSql = 'SELECT * FROM patients_auth WHERE verificationToken = ?';
-        console.log('Backend: Searching for user with token:', token); // Added log
-        const users = await new Promise((resolve, reject) => {
-            connection.query(findUserSql, [token], (err, results) => {
-                if (err) {
-                    console.error('Backend: Error finding user for verification:', err); // Added log
-                    return reject(err);
-                }
-                resolve(results);
-            });
-        });
-
-        if (users.length === 0) {
-            console.log('Backend: Invalid or expired verification token:', token); // Added log
-            return res.status(400).json({ success: false, message: 'Invalid or expired verification token.' });
-        }
-
-        const patientAuth = users[0];
-        console.log('Backend: Found user for verification:', patientAuth.id, 'Email:', patientAuth.email); // Added log
-
-        const updateSql = 'UPDATE patients_auth SET isVerified = 1, verificationToken = NULL WHERE id = ?';
-        console.log('Backend: Executing update query for user:', patientAuth.id); // Added log
-        const updateResult = await new Promise((resolve, reject) => {
-            connection.query(updateSql, [patientAuth.id], (err, result) => {
-                if (err) {
-                    console.error('Backend: Error updating user verification status:', err); // Added log
-                    return reject(err);
-                }
-                resolve(result);
-            });
-        });
-
-        console.log('Backend: Update result:', updateResult);
-
-        if (updateResult.affectedRows === 0) {
-            console.log(`Backend: Verification for user ${patientAuth.id} attempted, but no rows were updated. User might already be verified.`);
-        } else {
-            console.log(`Backend: User ${patientAuth.id} successfully verified.`); // Added log
-        }
-
-        res.json({ success: true, message: 'Email has been verified successfully! Redirecting...' });
-
-    } catch (err) {
-        console.error('Backend: Email verification error in catch block:', err); // Added log
-        res.status(500).json({ success: false, message: 'An error occurred during email verification.' });
-    } finally {
-        if (connection) connection.release();
-        console.log('Backend: DB connection released.'); // Added log
     }
 });
 

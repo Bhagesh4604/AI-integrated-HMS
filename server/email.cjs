@@ -20,18 +20,4 @@ async function sendPasswordResetEmail(to, token) {
   console.log('Password reset email sent to:', to);
 }
 
-async function sendVerificationEmail(to, token) {
-  const verificationLink = `${process.env.FRONTEND_URL}/verify-email?token=${token}`;
-  const msg = {
-    to: to,
-    from: 'bhageshbiradar820@gmail.com', // This must be a verified Sender Identity in SendGrid
-    subject: 'Verify Your Email Address',
-    text: `Welcome to Shree Medicare! Please verify your email address by clicking the following link:\n\n${verificationLink}\n\nIf you did not create an account, please ignore this email.`,
-    html: `<p>Welcome to Shree Medicare!</p><p>Please verify your email address by clicking the following link:</p><p><a href="${verificationLink}">${verificationLink}</a></p><p>If you did not create an account, please ignore this email.</p>`,
-  };
-
-  await sgMail.send(msg);
-  console.log('Verification email sent to:', to);
-}
-
-module.exports = { sendPasswordResetEmail, sendVerificationEmail };
+module.exports = { sendPasswordResetEmail };

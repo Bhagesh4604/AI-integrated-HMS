@@ -10,25 +10,10 @@ export default function PatientLogin({ onLogin, setAuthMode, setLoginPortal }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [showResendVerification, setShowResendVerification] = useState(false);
-  const [resendMessage, setResendMessage] = useState('');
-  const [isResending, setIsResending] = useState(false);
-  const [verificationMessage, setVerificationMessage] = useState('');
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('verified') === 'true') {
-      setVerificationMessage('Your email has been verified successfully! You can now log in.');
-    }
-  }, []);
-
-
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    setShowResendVerification(false);
-    setResendMessage('');
     setIsLoading(true);
     try {
       // Simulate network delay for UI feedback
@@ -43,34 +28,12 @@ export default function PatientLogin({ onLogin, setAuthMode, setLoginPortal }) {
         onLogin(data.patient);
       } else {
         setError(data.message || 'Invalid credentials. Please try again.');
-        if (data.message && data.message.includes('verify your email')) {
-          setShowResendVerification(true);
-        }
       }
     } catch (error) {
       console.error('Patient login error', error);
       setError('Failed to connect to the server.');
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleResendVerification = async () => {
-    setResendMessage('');
-    setIsResending(true);
-    try {
-      const response = await fetch(apiUrl('/api/auth/patient/resend-verification'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
-      const data = await response.json();
-      setResendMessage(data.message);
-    } catch (error) {
-      console.error('Resend verification error', error);
-      setResendMessage('Failed to connect to the server.');
-    } finally {
-      setIsResending(false);
     }
   };
   
@@ -129,16 +92,6 @@ export default function PatientLogin({ onLogin, setAuthMode, setLoginPortal }) {
           <p className="text-gray-300 mt-2 text-base">Sign in to access your health dashboard.</p>
         </motion.div>
         
-        {verificationMessage && (
-          <motion.p
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-sm text-green-400 text-center bg-green-900/30 p-3 rounded-lg"
-          >
-            {verificationMessage}
-          </motion.p>
-        )}
-
         <form onSubmit={handleSubmit} className="space-y-6">
           <motion.div variants={itemVariants}>
             <label className="block text-sm font-medium text-gray-400 mb-2">Email</label>
@@ -169,23 +122,6 @@ export default function PatientLogin({ onLogin, setAuthMode, setLoginPortal }) {
               >
                 {error}
               </motion.p>
-          )}
-
-          {showResendVerification && (
-            <motion.div variants={itemVariants} className="text-center p-4 bg-blue-900/30 rounded-lg">
-              <p className="text-sm text-blue-200 mb-3">It looks like your email isn't verified.</p>
-              <button
-                type="button"
-                onClick={handleResendVerification}
-                disabled={isResending}
-                className="w-full px-4 py-2 font-semibold text-white bg-blue-500 rounded-lg hover:bg-blue-600 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-black focus:ring-blue-400 disabled:bg-gray-600 disabled:cursor-not-allowed"
-              >
-                {isResending ? 'Sending...' : 'Resend Verification Link'}
-              </button>
-              {resendMessage && (
-                <p className="text-xs text-blue-100 mt-3">{resendMessage}</p>
-              )}
-            </motion.div>
           )}
 
           <motion.div variants={itemVariants}>

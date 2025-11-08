@@ -147,7 +147,7 @@ function App() {
   return (
       <Routes>
             <Route path="/reset-password" element={<ResetPassword setAuthMode={setPatientAuthMode} />} />
-            <Route path="/verify-email" element={<VerifyEmail />} />      <Route path="/" element={(() => {
+            <Route path="/" element={(() => {
           if (!loggedInUser) {
             if (loginPortal === 'staff') {
               return <StaffLogin onLogin={handleLogin} setLoginPortal={setLoginPortal} />;
