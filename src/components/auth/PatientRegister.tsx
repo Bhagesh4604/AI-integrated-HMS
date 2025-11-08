@@ -39,6 +39,7 @@ export default function PatientRegister({ setAuthMode, setLoginPortal }) {
         setAuthMode('login');
       } else {
         setError(data.message || 'Registration failed. Please try again.');
+        console.error('Registration failed:', data);
       }
     } catch (error) {
       console.error('Patient register error', error);
