@@ -32,6 +32,7 @@ export default function VerifyEmail() {
           setError(data.message || 'Failed to verify email.');
         }
       } catch (error) {
+        console.error('Email verification fetch error:', error);
         setError('Failed to connect to the server.');
       }
     };
