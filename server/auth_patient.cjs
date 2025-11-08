@@ -37,7 +37,7 @@ router.post('/register', async (req, res) => {
         });
 
         const patientId = `PAT${Math.floor(1000 + Math.random() * 9000)}`;
-        const patientSql = `INSERT INTO patients (patientId, firstName, lastName, email, contact, status) VALUES (?, ?, ?, ?, ?, 'active')`;
+        const patientSql = `INSERT INTO patients (patientId, firstName, lastName, email, phone, status) VALUES (?, ?, ?, ?, ?, 'active')`;
         const patientResult = await new Promise((resolve, reject) => {
             connection.query(patientSql, [patientId, firstName, lastName, email, contact], (err, result) => {
                 if (err) return reject(err);
