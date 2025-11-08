@@ -375,6 +375,8 @@ router.get('/verify-email', async (req, res) => {
             });
         });
 
+        console.log('Update result:', updateResult);
+
         if (updateResult.affectedRows === 0) {
             // This case should ideally not be reached if the token was found.
             // It could happen in a race condition if the link is clicked twice.
