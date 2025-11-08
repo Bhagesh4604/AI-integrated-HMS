@@ -8,6 +8,10 @@ const transporter = nodemailer.createTransport({
   }
 });
 
+console.log('Nodemailer transporter configured.');
+console.log(`GMAIL_USER loaded: ${process.env.GMAIL_USER ? 'Yes' : 'No'}`);
+console.log(`GMAIL_APP_PASSWORD loaded: ${process.env.GMAIL_APP_PASSWORD ? 'Yes' : 'No'}`);
+
 console.log('transporter:', transporter);
 
 async function sendPasswordResetEmail(to, token) {
