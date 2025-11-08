@@ -23,7 +23,14 @@ wss.on('connection', (ws) => {
 // --- CHANGE 1: Use Render's environment variable for PORT ---
 const PORT = process.env.PORT || 8080;
 
-app.use(cors());
+const corsOptions = {
+  origin: ['https://localhost', 'http://localhost', 'capacitor://localhost', 'http://localhost:8100'],
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+  credentials: true,
+  optionsSuccessStatus: 204
+};
+
+app.use(cors(corsOptions));
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, '..', 'public')));
 

@@ -1,0 +1,53 @@
+# Project Changes Summary
+
+This document summarizes the key changes made to the project files and deployment configurations.
+
+## Frontend Changes (Mobile App)
+
+### 1. `capacitor.config.ts`
+- **Change:** Removed the `server` block.
+- **Reason:** To ensure the Capacitor app loads local web assets (from the `dist` folder) instead of attempting to load the entire frontend from a remote URL. This allows the app to be self-contained while still making API calls to the backend.
+
+### 2. `vite.config.ts`
+- **Change:** Hardcoded `VITE_API_BASE` to `https://shreemedicare-backend.onrender.com`.
+- **Reason:** To ensure the mobile app correctly points to the deployed backend API. This was a temporary measure to bypass environment variable issues during the build process for the mobile app. (Note: For a production setup, using environment variables is recommended).
+
+### 3. `src/main.tsx`
+- **Change:** Replaced `BrowserRouter` with `HashRouter`.
+- **Reason:** `BrowserRouter` relies on the HTML5 history API, which does not work correctly when web assets are served via the `file://` protocol in a Capacitor app. `HashRouter` uses URL hashes, which are compatible with Capacitor's webview environment, resolving "Cannot GET /" errors and blank screens.
+
+### 4. `src/components/AppointmentsView.tsx`
+- **Change:** Added defensive checks for `app.appointmentDate` before calling `.toLocaleString()` and in filtering/sorting logic.
+- **Reason:** To prevent `TypeError: Cannot read properties of undefined (reading 'toLocaleString')` errors and app crashes when appointment date data was missing or malformed from the backend.
+
+### 5. `src/components/AnalyticsDashboard.tsx`
+- **Change:** Added robust checks for data arrays (e.g., `data.newPatientsToday`) before accessing elements, and made `bedOccupancy` calculation more defensive. Also added `JSON.stringify` to backend data logging.
+- **Reason:** To prevent `TypeError: Cannot read properties of undefined (reading '0')` and `TypeError: Cannot read properties of undefined (reading 'toFixed')` errors, ensuring the dashboard displays correctly even with partial or missing data from the backend. The `JSON.stringify` was for debugging the backend response.
+
+## Backend Changes (Render Deployment)
+
+### 1. `server/index.cjs`
+- **Change:** Updated CORS configuration to explicitly allow `https://localhost`, `http://localhost`, `capacitor://localhost`, and `http://localhost:8100` origins.
+- **Reason:** To resolve `Access to fetch... has been blocked by CORS policy` errors, allowing the mobile app (running in a Capacitor webview) to make API requests to the Render-deployed backend.
+
+### 2. `server/patients.cjs`
+- **Change:** Destructured `firstName`, `lastName`, and other patient details from `req.body` in the `router.post('/add')` route.
+- **Reason:** To fix `ReferenceError: firstName is not defined`, which was preventing new patients from being added.
+
+### 3. `server/portal.cjs`
+- **Change:** Formatted `startTime` and `endTime` values to `YYYY-MM-DD HH:MM:SS` before inserting into `virtual_consultation_rooms` table.
+- **Reason:** To fix `ER_TRUNCATED_WRONG_VALUE` error, ensuring correct date-time format for MySQL and enabling virtual consultation room creation.
+
+### 4. `server/pharmacy.cjs`
+- **Change:** Coalesced empty strings to `0` for `unitPrice`, `stockQuantity`, and `reorderLevel` in the `router.post('/medicines/add')` route.
+- **Reason:** To fix `ER_TRUNCATED_WRONG_VALUE_FOR_FIELD` error, preventing crashes when empty strings were sent for numeric database fields.
+
+### 5. `server/analytics.cjs`
+- **Change:** Modified the `.catch` block in the `/summary` route to include the detailed error message (`err.message || err`) in the JSON response.
+- **Reason:** To provide more specific debugging information to the frontend when one of the analytics queries fails on the backend.
+
+## Deployment URL
+
+- **Backend URL:** `https://shreemedicare-backend.onrender.com`
+  - This URL is now hardcoded in `vite.config.ts` for the mobile app build.
+  - The backend itself is deployed on Render at this address.
