@@ -75,10 +75,10 @@ router.get('/ambulances/available', (req, res) => {
       a.ambulance_id,
       a.vehicle_name,
       a.license_plate
-    FROM Ambulances a
+    FROM ambulances a
     WHERE a.ambulance_id NOT IN (
       SELECT DISTINCT ac.ambulance_id
-      FROM AmbulanceCrews ac
+      FROM ambulanceCrews ac
       WHERE ac.shift_end_time IS NULL
     )
   `;
@@ -93,7 +93,7 @@ router.get('/ambulances/available', (req, res) => {
 
 // Get All Ambulances Status
 router.get('/ambulances/status', (req, res) => {
-  const sql = `SELECT ambulance_id, vehicle_name, license_plate, current_status FROM Ambulances ORDER BY vehicle_name`;
+  const sql = `SELECT ambulance_id, vehicle_name, license_plate, current_status FROM ambulances ORDER BY vehicle_name`;
   executeQuery(sql, [], (err, results) => {
     if (err) {
       console.error("Database error fetching ambulance statuses:", err);
@@ -107,17 +107,17 @@ router.get('/ambulances/status', (req, res) => {
 router.get('/ambulances/locations', (req, res) => {
   const sql = `
     SELECT alh.ambulance_id, alh.latitude, alh.longitude, alh.timestamp, a.vehicle_name
-    FROM AmbulanceLocationHistory alh
+    FROM ambulanceLocationHistory alh
     INNER JOIN (
         SELECT ambulance_id, MAX(timestamp) as max_timestamp
-        FROM AmbulanceLocationHistory
+        FROM ambulanceLocationHistory
         GROUP BY ambulance_id
     ) as latest ON alh.ambulance_id = latest.ambulance_id AND alh.timestamp = latest.max_timestamp
-    JOIN Ambulances a ON alh.ambulance_id = a.ambulance_id
+    JOIN ambulances a ON alh.ambulance_id = a.ambulance_id
     WHERE a.current_status = 'Available'
     AND a.ambulance_id IN (
       SELECT DISTINCT ac.ambulance_id
-      FROM AmbulanceCrews ac
+      FROM ambulanceCrews ac
       WHERE ac.shift_end_time IS NULL
     )
   `;
@@ -137,13 +137,13 @@ router.post('/ambulances', (req, res) => {
     return res.status(400).json({ success: false, message: 'Vehicle name and license plate are required.' });
   }
 
-  const sql = `INSERT INTO Ambulances (vehicle_name, license_plate, current_status) VALUES (?, ?, 'Available')`;
+  const sql = `INSERT INTO ambulances (vehicle_name, license_plate, current_status) VALUES (?, ?, 'Available')`;
   executeQuery(sql, [vehicle_name, license_plate], (err, result) => {
     if (err) {
       console.error("Database error adding ambulance:", err);
       return res.status(500).json({ success: false, message: 'Failed to add ambulance.' });
     }
-    res.json({ success: true, message: 'Ambulance added successfully.', ambulance_id: result.insertId });
+    res.json({ success: true, message: 'ambulance added successfully.', ambulance_id: result.insertId });
   });
 });
 
@@ -151,19 +151,19 @@ router.post('/ambulances', (req, res) => {
 router.delete('/ambulances/:id', (req, res) => {
   const { id } = req.params;
   if (!id) {
-    return res.status(400).json({ success: false, message: 'Ambulance ID is required.' });
+    return res.status(400).json({ success: false, message: 'ambulance ID is required.' });
   }
 
-  const sql = `DELETE FROM Ambulances WHERE ambulance_id = ?`;
+  const sql = `DELETE FROM ambulances WHERE ambulance_id = ?`;
   executeQuery(sql, [id], (err, result) => {
     if (err) {
       console.error("Database error deleting ambulance:", err);
       return res.status(500).json({ success: false, message: 'Failed to delete ambulance.' });
     }
     if (result.affectedRows === 0) {
-      return res.status(404).json({ success: false, message: 'Ambulance not found.' });
+      return res.status(404).json({ success: false, message: 'ambulance not found.' });
     }
-    res.json({ success: true, message: 'Ambulance deleted successfully.' });
+    res.json({ success: true, message: 'ambulance deleted successfully.' });
   });
 });
 
@@ -172,7 +172,7 @@ router.put('/ambulances/:id/status', (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
   if (!id || !status) {
-    return res.status(400).json({ success: false, message: 'Ambulance ID and status are required.' });
+    return res.status(400).json({ success: false, message: 'ambulance ID and status are required.' });
   }
 
   const validStatuses = ['Available', 'On_Trip', 'Not_Available'];
@@ -180,16 +180,16 @@ router.put('/ambulances/:id/status', (req, res) => {
     return res.status(400).json({ success: false, message: 'Invalid status.' });
   }
 
-  const sql = `UPDATE Ambulances SET current_status = ? WHERE ambulance_id = ?`;
+  const sql = `UPDATE ambulances SET current_status = ? WHERE ambulance_id = ?`;
   executeQuery(sql, [status, id], (err, result) => {
     if (err) {
       console.error("Database error updating ambulance status:", err);
       return res.status(500).json({ success: false, message: 'Failed to update ambulance status.' });
     }
     if (result.affectedRows === 0) {
-      return res.status(404).json({ success: false, message: 'Ambulance not found.' });
+      return res.status(404).json({ success: false, message: 'ambulance not found.' });
     }
-    res.json({ success: true, message: 'Ambulance status updated successfully.' });
+    res.json({ success: true, message: 'ambulance status updated successfully.' });
   });
 });
 
@@ -200,10 +200,10 @@ router.get('/trips/active', (req, res) => {
       et.*, 
       a.vehicle_name, 
       a.license_plate,
-      (SELECT alh.latitude FROM AmbulanceLocationHistory alh WHERE alh.ambulance_id = et.assigned_ambulance_id ORDER BY alh.timestamp DESC LIMIT 1) as last_latitude,
-      (SELECT alh.longitude FROM AmbulanceLocationHistory alh WHERE alh.ambulance_id = et.assigned_ambulance_id ORDER BY alh.timestamp DESC LIMIT 1) as last_longitude
+      (SELECT alh.latitude FROM ambulanceLocationHistory alh WHERE alh.ambulance_id = et.assigned_ambulance_id ORDER BY alh.timestamp DESC LIMIT 1) as last_latitude,
+      (SELECT alh.longitude FROM ambulanceLocationHistory alh WHERE alh.ambulance_id = et.assigned_ambulance_id ORDER BY alh.timestamp DESC LIMIT 1) as last_longitude
     FROM EmergencyTrips et
-    LEFT JOIN Ambulances a ON et.assigned_ambulance_id = a.ambulance_id
+    LEFT JOIN ambulances a ON et.assigned_ambulance_id = a.ambulance_id
     WHERE et.status IN ('Assigned', 'En_Route_To_Scene', 'At_Scene', 'Transporting')
     ORDER BY et.alert_timestamp DESC
   `;
@@ -221,7 +221,7 @@ router.post('/trips/assign', async (req, res) => {
   const { trip_id, ambulance_id } = req.body;
 
   if (!trip_id || !ambulance_id) {
-    return res.status(400).json({ success: false, message: 'Trip ID and Ambulance ID are required.' });
+    return res.status(400).json({ success: false, message: 'Trip ID and ambulance ID are required.' });
   }
 
   let connection;
@@ -253,9 +253,9 @@ router.post('/trips/assign', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Trip not found or already assigned.' });
     }
 
-    const updateAmbulanceSql = `UPDATE Ambulances SET current_status = 'On_Trip', current_trip_id = ? WHERE ambulance_id = ? AND current_status = 'Available'`;
+    const updateambulanceSql = `UPDATE ambulances SET current_status = 'On_Trip', current_trip_id = ? WHERE ambulance_id = ? AND current_status = 'Available'`;
     const ambulanceUpdateResult = await new Promise((resolve, reject) => {
-      connection.query(updateAmbulanceSql, [trip_id, ambulance_id], (err, result) => {
+      connection.query(updateambulanceSql, [trip_id, ambulance_id], (err, result) => {
         if (err) return reject(err);
         resolve(result);
       });
@@ -263,7 +263,7 @@ router.post('/trips/assign', async (req, res) => {
 
     if (ambulanceUpdateResult.affectedRows === 0) {
       await new Promise(resolve => connection.rollback(() => resolve()));
-      return res.status(400).json({ success: false, message: 'Ambulance not found or not available.' });
+      return res.status(400).json({ success: false, message: 'ambulance not found or not available.' });
     }
 
     await new Promise((resolve, reject) => {
@@ -274,16 +274,16 @@ router.post('/trips/assign', async (req, res) => {
     });
 
     // Fetch the updated ambulance to broadcast
-    const getAmbulanceSql = `SELECT * FROM Ambulances WHERE ambulance_id = ?`;
+    const getambulanceSql = `SELECT * FROM ambulances WHERE ambulance_id = ?`;
     const updatedAmbulance = await new Promise((resolve, reject) => {
-      connection.query(getAmbulanceSql, [ambulance_id], (err, result) => {
-        if (err || result.length === 0) return reject(err || new Error('Ambulance not found after update.'));
+      connection.query(getambulanceSql, [ambulance_id], (err, result) => {
+        if (err || result.length === 0) return reject(err || new Error('ambulance not found after update.'));
         resolve(result[0]);
       });
     });
 
     // Fetch the last known location of the assigned ambulance
-    const getLastLocationSql = `SELECT latitude, longitude FROM AmbulanceLocationHistory WHERE ambulance_id = ? ORDER BY timestamp DESC LIMIT 1`;
+    const getLastLocationSql = `SELECT latitude, longitude FROM ambulanceLocationHistory WHERE ambulance_id = ? ORDER BY timestamp DESC LIMIT 1`;
     const lastLocation = await new Promise((resolve, reject) => {
       executeQuery(getLastLocationSql, [ambulance_id], (err, result) => {
         if (err) return reject(err);
@@ -304,7 +304,7 @@ router.post('/trips/assign', async (req, res) => {
     broadcast(req.wss, { type: 'TRIP_ASSIGNED', payload: { trip: tripDetails, ambulance: updatedAmbulance, lastLocation } });
 
     // --- Send Push Notification to assigned paramedic ---
-    const getParamedicSql = `SELECT ac.user_id FROM AmbulanceCrews ac WHERE ac.ambulance_id = ?`;
+    const getParamedicSql = `SELECT ac.user_id FROM ambulanceCrews ac WHERE ac.ambulance_id = ?`;
     const paramedics = await new Promise((resolve, reject) => {
       executeQuery(getParamedicSql, [ambulance_id], (err, res) => {
         if (err) return reject(err);
@@ -344,7 +344,7 @@ router.post('/trips/assign', async (req, res) => {
     }
 
     // Broadcast WebSocket message
-    broadcast(req.wss, { type: 'TRIP_ASSIGNED', payload: { trip: tripDetails, ambulance: updatedAmbulance, lastLocation } });
+    broadcast(req.wss, { type: 'TRIP_ASSIGNED', payload: { trip: tripDetails, ambulance: updatedambulance, lastLocation } });
 
     res.json({ success: true, message: 'Trip assigned successfully!' });
 
@@ -417,8 +417,8 @@ router.get('/paramedic/my-trip', (req, res) => {
       p.phone AS patient_phone,
       p.email AS patient_email
     FROM EmergencyTrips et
-    JOIN Ambulances a ON et.assigned_ambulance_id = a.ambulance_id
-    JOIN AmbulanceCrews ac ON a.ambulance_id = ac.ambulance_id
+    JOIN ambulances a ON et.assigned_ambulance_id = a.ambulance_id
+    JOIN ambulancecrews ac ON a.ambulance_id = ac.ambulance_id
     LEFT JOIN patients p ON et.patient_id = p.id
     WHERE ac.user_id = ? AND et.status IN ('Assigned', 'En_Route_To_Scene', 'At_Scene', 'Transporting', 'At_Hospital')
     ORDER BY et.alert_timestamp DESC
@@ -501,7 +501,7 @@ router.post('/trips/status', async (req, res) => {
     const getTripSql = `
       SELECT et.*, a.vehicle_name, a.license_plate
       FROM EmergencyTrips et
-      LEFT JOIN Ambulances a ON et.assigned_ambulance_id = a.ambulance_id
+      LEFT JOIN ambulances a ON et.assigned_ambulance_id = a.ambulance_id
       WHERE et.trip_id = ?
     `;
     const trips = await new Promise((resolve, reject) => {
@@ -518,7 +518,7 @@ router.post('/trips/status', async (req, res) => {
     const updatedTrip = trips[0];
 
     // Also fetch the last known location to send with the update
-    const getLastLocationSql = `SELECT latitude, longitude FROM AmbulanceLocationHistory WHERE ambulance_id = ? ORDER BY timestamp DESC LIMIT 1`;
+    const getLastLocationSql = `SELECT latitude, longitude FROM ambulanceLocationHistory WHERE ambulance_id = ? ORDER BY timestamp DESC LIMIT 1`;
     const lastLocation = await new Promise((resolve, reject) => {
       executeQuery(getLastLocationSql, [updatedTrip.assigned_ambulance_id], (err, result) => {
         if (err) return reject(err);
@@ -582,9 +582,9 @@ router.post('/trips/complete', async (req, res) => {
     });
 
     // Update ambulance status to 'Available'
-    const updateAmbulanceSql = `UPDATE Ambulances SET current_status = 'Available', current_trip_id = NULL WHERE ambulance_id = ?`;
+    const updateambulanceSql = `UPDATE ambulances SET current_status = 'Available', current_trip_id = NULL WHERE ambulance_id = ?`;
     await new Promise((resolve, reject) => {
-      connection.query(updateAmbulanceSql, [assigned_ambulance_id], (err, result) => {
+      connection.query(updateambulanceSql, [assigned_ambulance_id], (err, result) => {
         if (err) return reject(err);
         resolve(result);
       });
@@ -598,16 +598,16 @@ router.post('/trips/complete', async (req, res) => {
     });
 
     // Fetch the updated ambulance to broadcast
-    const getAmbulanceSql = `SELECT * FROM Ambulances WHERE ambulance_id = ?`;
+    const getambulanceSql = `SELECT * FROM ambulances WHERE ambulance_id = ?`;
     const updatedAmbulance = await new Promise((resolve, reject) => {
-      connection.query(getAmbulanceSql, [assigned_ambulance_id], (err, result) => {
-        if (err || result.length === 0) return reject(err || new Error('Ambulance not found after update.'));
+      connection.query(getambulanceSql, [assigned_ambulance_id], (err, result) => {
+        if (err || result.length === 0) return reject(err || new Error('ambulance not found after update.'));
         resolve(result[0]);
       });
     });
 
     // Broadcast WebSocket message
-    broadcast(req.wss, { type: 'TRIP_COMPLETED', payload: { trip_id, ambulance: updatedAmbulance } });
+    broadcast(req.wss, { type: 'TRIP_COMPLETED', payload: { trip_id, ambulance: updatedambulance } });
 
     res.json({ success: true, message: 'Trip completed successfully!' });
 
@@ -651,7 +651,7 @@ router.get('/trips/transporting', (req, res) => {
     FROM
       EmergencyTrips et
     JOIN
-      Ambulances a ON et.assigned_ambulance_id = a.ambulance_id
+      ambulances a ON et.assigned_ambulance_id = a.ambulance_id
     WHERE
       et.status = 'Transporting'
     ORDER BY
@@ -676,11 +676,11 @@ router.post('/ambulance/location', (req, res) => {
   const { ambulance_id, latitude, longitude, timestamp } = req.body;
 
   if (!ambulance_id || latitude === undefined || longitude === undefined || !timestamp) {
-    return res.status(400).json({ success: false, message: 'Ambulance ID, latitude, longitude, and timestamp are required.' });
+    return res.status(400).json({ success: false, message: 'ambulance ID, latitude, longitude, and timestamp are required.' });
   }
 
-  // Store this location data in a database table (e.g., AmbulanceLocationHistory)
-  const insertLocationSql = `INSERT INTO AmbulanceLocationHistory (ambulance_id, latitude, longitude, timestamp) VALUES (?, ?, ?, ?)`;
+  // Store this location data in a database table (e.g., mbulanceLocationHistory)
+  const insertLocationSql = `INSERT INTO ambulanceLocationHistory (ambulance_id, latitude, longitude, timestamp) VALUES (?, ?, ?, ?)`;
   executeQuery(insertLocationSql, [ambulance_id, latitude, longitude, timestamp], (err, results) => {
     if (err) {
       console.error("Database error storing ambulance location:", err);
@@ -780,7 +780,7 @@ router.get('/trips/history', (req, res) => {
   const sql = `
     SELECT et.trip_id, et.status, et.scene_location_lat, et.scene_location_lon, et.alert_timestamp, et.updated_at, a.vehicle_name
     FROM EmergencyTrips et
-    LEFT JOIN Ambulances a ON et.assigned_ambulance_id = a.ambulance_id
+    LEFT JOIN ambulances a ON et.assigned_ambulance_id = a.ambulance_id
     WHERE et.status = 'Completed'
     ORDER BY et.updated_at DESC
     LIMIT 100; -- Add a limit to prevent fetching too much data at once
@@ -831,8 +831,8 @@ router.get('/crews/my-shift', (req, res) => {
 
   const sql = `
     SELECT ac.shift_id, ac.ambulance_id, ac.shift_start_time, a.vehicle_name
-    FROM AmbulanceCrews ac
-    JOIN Ambulances a ON ac.ambulance_id = a.ambulance_id
+    FROM ambulanceCrews ac
+    JOIN ambulances a ON ac.ambulance_id = a.ambulance_id
     WHERE ac.user_id = ? AND ac.shift_end_time IS NULL
     LIMIT 1;
   `;
@@ -850,12 +850,12 @@ router.get('/crews/my-shift', (req, res) => {
 router.post('/crews/clock-in', async (req, res) => {
   const { user_id, ambulance_id } = req.body;
   if (!user_id || !ambulance_id) {
-    return res.status(400).json({ success: false, message: 'User ID and Ambulance ID are required.' });
+    return res.status(400).json({ success: false, message: 'User ID and ambulance ID are required.' });
   }
 
   try {
     // Check if user already has an active shift
-    const checkSql = `SELECT shift_id FROM AmbulanceCrews WHERE user_id = ? AND shift_end_time IS NULL`;
+    const checkSql = `SELECT shift_id FROM ambulanceCrews WHERE user_id = ? AND shift_end_time IS NULL`;
     const activeShifts = await new Promise((resolve, reject) => {
       executeQuery(checkSql, [user_id], (err, result) => {
         if (err) return reject(err);
@@ -868,7 +868,7 @@ router.post('/crews/clock-in', async (req, res) => {
     }
 
     // Create new shift using UTC_TIMESTAMP()
-    const insertSql = `INSERT INTO AmbulanceCrews (user_id, ambulance_id, shift_start_time) VALUES (?, ?, UTC_TIMESTAMP())`;
+    const insertSql = `INSERT INTO ambulanceCrews (user_id, ambulance_id, shift_start_time) VALUES (?, ?, UTC_TIMESTAMP())`;
     const insertResult = await new Promise((resolve, reject) => {
       executeQuery(insertSql, [user_id, ambulance_id], (err, result) => {
         if (err) return reject(err);
@@ -893,7 +893,7 @@ router.post('/crews/clock-out', async (req, res) => {
 
   try {
     // Find active shift and update it
-    const updateSql = `UPDATE AmbulanceCrews SET shift_end_time = NOW() WHERE user_id = ? AND shift_end_time IS NULL`;
+    const updateSql = `UPDATE ambulanceCrews SET shift_end_time = NOW() WHERE user_id = ? AND shift_end_time IS NULL`;
     const updateResult = await new Promise((resolve, reject) => {
       executeQuery(updateSql, [user_id], (err, result) => {
         if (err) return reject(err);
@@ -925,7 +925,7 @@ router.get('/paramedic/trip-history', (req, res) => {
     FROM EmergencyTrips et
     WHERE et.assigned_ambulance_id IN (
       SELECT DISTINCT ac.ambulance_id
-      FROM AmbulanceCrews ac
+      FROM ambulanceCrews ac
       WHERE ac.user_id = ?
     )
     ORDER BY et.alert_timestamp DESC;
