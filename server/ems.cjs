@@ -767,7 +767,7 @@ router.post('/paramedic/register-device', (req, res) => {
       executeQuery(insertSql, [employeeId, deviceToken], (insertErr) => {
         if (insertErr) {
           console.error("Database error inserting device token:", insertErr);
-          return res.status(5MY500).json({ success: false, message: 'Failed to register device token.' });
+          return res.status(500).json({ success: false, message: 'Failed to register device token.' });
         }
         res.json({ success: true, message: 'Device token registered successfully.' });
       });
@@ -837,7 +837,7 @@ router.get('/crews/my-shift', (req, res) => {
     LIMIT 1;
   `;
 
-  executeQuery(sql, [paramedicId], (err, results) => {
+  executeQuery(sql, [paramedicId], (err,. results) => {
     if (err) {
       console.error("Database error fetching paramedic's shift:", err);
       return res.status(500).json({ success: false, message: 'Failed to fetch shift.' });
