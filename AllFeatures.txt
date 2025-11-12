@@ -1,0 +1,64 @@
+Here is a comprehensive list of all the features in the Shree Medicare HMS application:
+
+### Core Hospital Management System (HMS) Features
+- **Patient Management:** Full lifecycle management including patient registration, admissions, and discharges.
+- **Medical Records:** Comprehensive electronic health records (EHR) with diagnosis, treatment history, and notes.
+- **Pharmacy Management:** Dispensing medication, tracking stock levels, and managing pharmaceutical inventory.
+- **Laboratory Module:** Ordering lab tests, managing test details, and recording results.
+- **Surgical Management:** Scheduling surgeries, managing operating rooms, and maintaining surgical records.
+- **Employee Management:** Managing all staff including doctors, admins, and paramedics with role-based access.
+- **Doctor Scheduling:** Creating and managing doctor schedules for appointments and consultations.
+- **Bed Management:** Live visual dashboard to view and manage the status of all hospital beds (available, occupied, maintenance).
+- **Billing & Invoicing:** Generating patient bills, tracking payment status, and managing bill items.
+- **Accounting Module:** Managing accounts payable and accounts receivable.
+- **Payroll Management:** Processing payroll for employees.
+- **Inventory Management:** Tracking and managing hospital inventory and supplies.
+- **Vendor Management:** Managing relationships and details of external vendors.
+- **Immunization Module:** Tracking patient immunization records and schedules.
+- **SMS Notifications:** Sending SMS alerts for various events (e.g., appointments).
+- **Analytics Dashboard:** Providing administrators with key metrics and data visualizations about hospital operations.
+
+### Patient-Facing Features (Patient Portal)
+- **Secure Patient Login & Registration:** Authentication system for patients.
+- **Patient Dashboard:** A central hub for patients to access their information.
+- **Appointment Booking:** Ability to schedule in-person or virtual appointments with doctors.
+- **View Medical History:** Access to personal medical records, diagnoses, and treatment plans.
+- **View Prescriptions:** A list of all current and past prescriptions.
+- **Medication Adherence Tracker:** A tool for patients to track their medication intake.
+- **View Lab Results:** Access to the results of their laboratory tests.
+- **Telemedicine & Virtual Consultations:** Joining secure video consultation rooms with doctors.
+- **Profile Management:** Patients can view and update their profile information.
+
+### Emergency Medical Services (EMS) Module
+- **Real-time Ambulance Booking:** "Uber-like" feature for patients to book an ambulance using their current location or by entering an address.
+- **Real-time Ambulance Tracking:** Patients can track the assigned ambulance on a live map with real-time location updates and ETA.
+- **Dispatcher Dashboard (Fleet Management):**
+    - Live map view of all ambulances and their status.
+    - Real-time list of new emergency alerts and active trips.
+    - Manual assignment of ambulances to incoming alerts.
+    - Ability to manually create new emergency alerts.
+    - Comprehensive fleet status overview.
+    - A historical view of all completed trips.
+- **Paramedic Mode:**
+    - A dedicated interface for paramedics.
+    - Shift management with clock-in and clock-out functionality.
+    - Viewing assigned trip details, including patient information and location.
+    - Real-time GPS location tracking sent to the system.
+    - Ability to update trip status (e.g., "At Scene," "Transporting").
+    - A form to submit patient vitals (heart rate, blood pressure) during transport.
+    - Integration with Google Maps for turn-by-turn navigation.
+- **ER Pre-Arrival Dashboard:**
+    - A dedicated dashboard for Emergency Room staff.
+    - Live map view of all incoming ambulances that are transporting patients.
+    - Real-time display of patient vitals being sent from the ambulance.
+    - Continuously updated ETA for each incoming ambulance.
+
+### System & General Features
+- **Role-Based Access Control (RBAC):** Granular permissions for different user roles (Admin, Doctor, Patient, Dispatcher, Paramedic, ER Staff).
+- **AI-Powered Triage Chat:** An AI assistant to help with initial patient triage and information gathering.
+- **AI Assistant:** A general-purpose AI assistant integrated into the system.
+- **Secure Authentication:** Robust login/logout, password reset, and protected routes.
+- **Push Notifications:** Real-time push notifications sent to paramedics when a new trip is assigned.
+- **Dark/Light Theme:** A modern UI with a theme toggle for user preference.
+- **Interactive UI Elements:** Engaging animations and UI elements like the "tuggable lamp" and stethoscope animations.
+- **Responsive Design:** The application is designed to work on both desktop and mobile devices.
