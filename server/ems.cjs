@@ -78,7 +78,7 @@ router.get('/ambulances/available', (req, res) => {
     FROM ambulances a
     WHERE a.ambulance_id NOT IN (
       SELECT DISTINCT ac.ambulance_id
-      FROM ambulanceCrews ac
+      FROM ambulancecrews ac
       WHERE ac.shift_end_time IS NULL
     )
   `;
@@ -117,7 +117,7 @@ router.get('/ambulances/locations', (req, res) => {
     WHERE a.current_status = 'Available'
     AND a.ambulance_id IN (
       SELECT DISTINCT ac.ambulance_id
-      FROM ambulanceCrews ac
+      FROM ambulancecrews ac
       WHERE ac.shift_end_time IS NULL
     )
   `;
@@ -304,7 +304,7 @@ router.post('/trips/assign', async (req, res) => {
     broadcast(req.wss, { type: 'TRIP_ASSIGNED', payload: { trip: tripDetails, ambulance: updatedAmbulance, lastLocation } });
 
     // --- Send Push Notification to assigned paramedic ---
-    const getParamedicSql = `SELECT ac.user_id FROM ambulanceCrews ac WHERE ac.ambulance_id = ?`;
+    const getParamedicSql = `SELECT ac.user_id FROM ambulancecrews ac WHERE ac.ambulance_id = ?`;
     const paramedics = await new Promise((resolve, reject) => {
       executeQuery(getParamedicSql, [ambulance_id], (err, res) => {
         if (err) return reject(err);
@@ -831,7 +831,7 @@ router.get('/crews/my-shift', (req, res) => {
 
   const sql = `
     SELECT ac.shift_id, ac.ambulance_id, ac.shift_start_time, a.vehicle_name
-    FROM ambulanceCrews ac
+    FROM ambulancecrews ac
     JOIN ambulances a ON ac.ambulance_id = a.ambulance_id
     WHERE ac.user_id = ? AND ac.shift_end_time IS NULL
     LIMIT 1;
@@ -855,7 +855,7 @@ router.post('/crews/clock-in', async (req, res) => {
 
   try {
     // Check if user already has an active shift
-    const checkSql = `SELECT shift_id FROM ambulanceCrews WHERE user_id = ? AND shift_end_time IS NULL`;
+    const checkSql = `SELECT shift_id FROM ambulancecrews WHERE user_id = ? AND shift_end_time IS NULL`;
     const activeShifts = await new Promise((resolve, reject) => {
       executeQuery(checkSql, [user_id], (err, result) => {
         if (err) return reject(err);
@@ -868,7 +868,7 @@ router.post('/crews/clock-in', async (req, res) => {
     }
 
     // Create new shift using UTC_TIMESTAMP()
-    const insertSql = `INSERT INTO ambulanceCrews (user_id, ambulance_id, shift_start_time) VALUES (?, ?, UTC_TIMESTAMP())`;
+    const insertSql = `INSERT INTO ambulancecrews (user_id, ambulance_id, shift_start_time) VALUES (?, ?, UTC_TIMESTAMP())`;
     const insertResult = await new Promise((resolve, reject) => {
       executeQuery(insertSql, [user_id, ambulance_id], (err, result) => {
         if (err) return reject(err);
@@ -893,7 +893,7 @@ router.post('/crews/clock-out', async (req, res) => {
 
   try {
     // Find active shift and update it
-    const updateSql = `UPDATE ambulanceCrews SET shift_end_time = NOW() WHERE user_id = ? AND shift_end_time IS NULL`;
+    const updateSql = `UPDATE ambulancecrews SET shift_end_time = NOW() WHERE user_id = ? AND shift_end_time IS NULL`;
     const updateResult = await new Promise((resolve, reject) => {
       executeQuery(updateSql, [user_id], (err, result) => {
         if (err) return reject(err);
@@ -925,7 +925,7 @@ router.get('/paramedic/trip-history', (req, res) => {
     FROM EmergencyTrips et
     WHERE et.assigned_ambulance_id IN (
       SELECT DISTINCT ac.ambulance_id
-      FROM ambulanceCrews ac
+      FROM ambulancecrews ac
       WHERE ac.user_id = ?
     )
     ORDER BY et.alert_timestamp DESC;
