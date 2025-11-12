@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -129,7 +129,7 @@ function App() {
     }
   }, []);
 
-  const navigateToDashboard = (user) => {
+  const navigateToDashboard = useCallback((user) => {
     switch (user.role) {
       case 'patient':
         navigate('/patient-dashboard');
@@ -149,14 +149,19 @@ function App() {
         navigate('/staff-dashboard');
         break;
     }
-  };
+  }, [navigate]);
 
   const handleLogin = (user) => {
     const userWithRole = user.role ? user : { ...user, role: 'patient' };
     localStorage.setItem('loggedInUser', JSON.stringify(userWithRole));
     setLoggedInUser(userWithRole);
-    navigateToDashboard(userWithRole);
   };
+
+  useEffect(() => {
+    if (loggedInUser && location.pathname.includes('/login')) {
+      navigateToDashboard(loggedInUser);
+    }
+  }, [loggedInUser, location.pathname, navigateToDashboard]);
 
   const handleLogout = () => {
     localStorage.removeItem('loggedInUser');

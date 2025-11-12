@@ -402,7 +402,7 @@ INSERT INTO `doctor_schedules` (`id`, `doctorId`, `dayOfWeek`, `startTime`, `end
 CREATE TABLE `emergencytrips` (
   `trip_id` varchar(50) NOT NULL,
   `status` enum('New_Alert','Assigned','En_Route_To_Scene','At_Scene','Transporting','At_Hospital','Completed','Cancelled') DEFAULT 'New_Alert',
-  `alert_source` enum('AcciRadar','Manual_Entry') NOT NULL,
+  `alert_source` enum('AcciRadar','Manual_Entry','Patient_App') NOT NULL,
   `scene_location_lat` decimal(10,7) NOT NULL,
   `scene_location_lon` decimal(10,7) NOT NULL,
   `alert_timestamp` datetime NOT NULL,

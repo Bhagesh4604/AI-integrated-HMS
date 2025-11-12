@@ -309,8 +309,7 @@ const ParamedicMode = ({ user }) => {
 
   useEffect(() => {
     if (activeShift) {
-      const interval = setInterval(fetchMyTrip, 15000);
-      return () => clearInterval(interval);
+      fetchMyTrip();
     }
   }, [activeShift]);
 

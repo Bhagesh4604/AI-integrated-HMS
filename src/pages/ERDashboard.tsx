@@ -121,13 +121,6 @@ const ERDashboard = () => {
 
   useEffect(() => {
     fetchTransportingTrips(); // Initial fetch
-
-    const interval = setInterval(() => {
-      console.log('[ERDashboard] Polling for transporting trips...');
-      fetchTransportingTrips();
-    }, 10000); // Refetch every 10 seconds
-
-    return () => clearInterval(interval); // Cleanup on unmount
   }, []);
 
   // Create the destinations object for the MapView
