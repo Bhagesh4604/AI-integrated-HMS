@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import useWebSocket from '../hooks/useWebSocket';
+import AddAmbulanceForm from '../components/ems/AddAmbulanceForm';
 
 const TripHistoryView = ({ trips, isLoading, error }) => {
   console.log('[TripHistoryView] Rendering with props:', { trips, isLoading, error });
@@ -85,6 +86,8 @@ const FleetManagementDashboard = () => {
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [searchingPatients, setSearchingPatients] = useState(false);
   const [patientSearchError, setPatientSearchError] = useState('');
+
+  const [showAddAmbulanceModal, setShowAddAmbulanceModal] = useState(false);
 
   const handlePatientSearch = async (query) => {
     setPatientSearchQuery(query);
@@ -356,6 +359,44 @@ const FleetManagementDashboard = () => {
     }
   };
 
+  const handleDeleteAmbulance = async (ambulanceId) => {
+    if (!window.confirm('Are you sure you want to delete this ambulance?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(apiUrl(`/api/ems/ambulances/${ambulanceId}`), {
+        method: 'DELETE',
+      });
+      const data = await response.json();
+      if (data.success) {
+        fetchFleetStatus();
+      } else {
+        console.error('Failed to delete ambulance:', data.message);
+      }
+    } catch (error) {
+      console.error('Error deleting ambulance:', error);
+    }
+  };
+
+  const handleUpdateAmbulanceStatus = async (ambulanceId, status) => {
+    try {
+      const response = await fetch(apiUrl(`/api/ems/ambulances/${ambulanceId}/status`), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        fetchFleetStatus();
+      } else {
+        console.error('Failed to update ambulance status:', data.message);
+      }
+    } catch (error) {
+      console.error('Error updating ambulance status:', error);
+    }
+  };
+
   const handleWebSocketMessage = useCallback((message) => {
     console.log('Fleet Dashboard received WebSocket message:', message);
     const { type, payload } = message;
@@ -468,6 +509,12 @@ const FleetManagementDashboard = () => {
       <header className="bg-white dark:bg-gray-800 shadow p-4 flex justify-between items-center">
         <h1 className="text-2xl font-bold">Fleet Management</h1>
         <div className="flex items-center space-x-4">
+          <button
+            onClick={() => setShowAddAmbulanceModal(true)}
+            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+          >
+            + Add Ambulance
+          </button>
           <button
             onClick={handleToggleView}
             className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
@@ -583,6 +630,24 @@ const FleetManagementDashboard = () => {
                       ambulance.current_status === 'On_Trip' ? 'text-yellow-700 dark:text-yellow-300' :
                       'text-gray-700 dark:text-gray-300'
                     }`}>Status: {displayStatus}</p>
+                    <div className="flex space-x-2 mt-2">
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleDeleteAmbulance(ambulance.ambulance_id)}
+                      >
+                        Delete
+                      </Button>
+                      <select
+                        value={ambulance.current_status}
+                        onChange={(e) => handleUpdateAmbulanceStatus(ambulance.ambulance_id, e.target.value)}
+                        className="p-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm"
+                      >
+                        <option value="Available">Available</option>
+                        <option value="On_Trip">On Trip</option>
+                        <option value="Not_Available">Not Available</option>
+                      </select>
+                    </div>
                   </div>
                 );
               })
@@ -741,6 +806,12 @@ const FleetManagementDashboard = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AddAmbulanceForm
+        open={showAddAmbulanceModal}
+        onOpenChange={setShowAddAmbulanceModal}
+        onAmbulanceAdded={fetchFleetStatus}
+      />
     </div>
   );
 };

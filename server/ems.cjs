@@ -130,6 +130,69 @@ router.get('/ambulances/locations', (req, res) => {
   });
 });
 
+// Add a new ambulance
+router.post('/ambulances', (req, res) => {
+  const { vehicle_name, license_plate } = req.body;
+  if (!vehicle_name || !license_plate) {
+    return res.status(400).json({ success: false, message: 'Vehicle name and license plate are required.' });
+  }
+
+  const sql = `INSERT INTO Ambulances (vehicle_name, license_plate, current_status) VALUES (?, ?, 'Available')`;
+  executeQuery(sql, [vehicle_name, license_plate], (err, result) => {
+    if (err) {
+      console.error("Database error adding ambulance:", err);
+      return res.status(500).json({ success: false, message: 'Failed to add ambulance.' });
+    }
+    res.json({ success: true, message: 'Ambulance added successfully.', ambulance_id: result.insertId });
+  });
+});
+
+// Delete an ambulance
+router.delete('/ambulances/:id', (req, res) => {
+  const { id } = req.params;
+  if (!id) {
+    return res.status(400).json({ success: false, message: 'Ambulance ID is required.' });
+  }
+
+  const sql = `DELETE FROM Ambulances WHERE ambulance_id = ?`;
+  executeQuery(sql, [id], (err, result) => {
+    if (err) {
+      console.error("Database error deleting ambulance:", err);
+      return res.status(500).json({ success: false, message: 'Failed to delete ambulance.' });
+    }
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ success: false, message: 'Ambulance not found.' });
+    }
+    res.json({ success: true, message: 'Ambulance deleted successfully.' });
+  });
+});
+
+// Update ambulance status
+router.put('/ambulances/:id/status', (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  if (!id || !status) {
+    return res.status(400).json({ success: false, message: 'Ambulance ID and status are required.' });
+  }
+
+  const validStatuses = ['Available', 'On_Trip', 'Not_Available'];
+  if (!validStatuses.includes(status)) {
+    return res.status(400).json({ success: false, message: 'Invalid status.' });
+  }
+
+  const sql = `UPDATE Ambulances SET current_status = ? WHERE ambulance_id = ?`;
+  executeQuery(sql, [status, id], (err, result) => {
+    if (err) {
+      console.error("Database error updating ambulance status:", err);
+      return res.status(500).json({ success: false, message: 'Failed to update ambulance status.' });
+    }
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ success: false, message: 'Ambulance not found.' });
+    }
+    res.json({ success: true, message: 'Ambulance status updated successfully.' });
+  });
+});
+
 // Get Active Trips
 router.get('/trips/active', (req, res) => {
   const sql = `
