@@ -8,6 +8,7 @@ const fetch = require('node-fetch'); // Import node-fetch
 const broadcast = (wss, data) => {
   wss.clients.forEach(client => {
     if (client.readyState === WebSocket.OPEN) {
+  
       client.send(JSON.stringify(data));
     }
   });
@@ -21,7 +22,7 @@ const sendPushNotification = async (firebaseAdmin, employeeId, title, body, data
   }
 
   try {
-    const sql = 'SELECT device_token FROM ParamedicDeviceTokens WHERE employee_id = ?';
+    const sql = 'SELECT device_token FROM paramedicdevicetokens WHERE employee_id = ?';
     const results = await new Promise((resolve, reject) => {
       executeQuery(sql, [employeeId], (err, res) => {
         if (err) return reject(err);
@@ -107,10 +108,10 @@ router.get('/ambulances/status', (req, res) => {
 router.get('/ambulances/locations', (req, res) => {
   const sql = `
     SELECT alh.ambulance_id, alh.latitude, alh.longitude, alh.timestamp, a.vehicle_name
-    FROM ambulanceLocationHistory alh
+    FROM ambulancelocationhistory alh
     INNER JOIN (
         SELECT ambulance_id, MAX(timestamp) as max_timestamp
-        FROM ambulanceLocationHistory
+        FROM ambulancelocationhistory
         GROUP BY ambulance_id
     ) as latest ON alh.ambulance_id = latest.ambulance_id AND alh.timestamp = latest.max_timestamp
     JOIN ambulances a ON alh.ambulance_id = a.ambulance_id
@@ -200,8 +201,8 @@ router.get('/trips/active', (req, res) => {
       et.*, 
       a.vehicle_name, 
       a.license_plate,
-      (SELECT alh.latitude FROM ambulanceLocationHistory alh WHERE alh.ambulance_id = et.assigned_ambulance_id ORDER BY alh.timestamp DESC LIMIT 1) as last_latitude,
-      (SELECT alh.longitude FROM ambulanceLocationHistory alh WHERE alh.ambulance_id = et.assigned_ambulance_id ORDER BY alh.timestamp DESC LIMIT 1) as last_longitude
+      (SELECT alh.latitude FROM ambulancelocationhistory alh WHERE alh.ambulance_id = et.assigned_ambulance_id ORDER BY alh.timestamp DESC LIMIT 1) as last_latitude,
+      (SELECT alh.longitude FROM ambulancelocationhistory alh WHERE alh.ambulance_id = et.assigned_ambulance_id ORDER BY alh.timestamp DESC LIMIT 1) as last_longitude
     FROM emergencytrips et
     LEFT JOIN ambulances a ON et.assigned_ambulance_id = a.ambulance_id
     WHERE et.status IN ('Assigned', 'En_Route_To_Scene', 'At_Scene', 'Transporting')
@@ -283,7 +284,7 @@ router.post('/trips/assign', async (req, res) => {
     });
 
     // Fetch the last known location of the assigned ambulance
-    const getLastLocationSql = `SELECT latitude, longitude FROM ambulanceLocationHistory WHERE ambulance_id = ? ORDER BY timestamp DESC LIMIT 1`;
+    const getLastLocationSql = `SELECT latitude, longitude FROM ambulancelocationhistory WHERE ambulance_id = ? ORDER BY timestamp DESC LIMIT 1`;
     const lastLocation = await new Promise((resolve, reject) => {
       executeQuery(getLastLocationSql, [ambulance_id], (err, result) => {
         if (err) return reject(err);
@@ -449,13 +450,13 @@ router.post('/vitals', (req, res) => {
 
   const timestamp = new Date();
   const newVitals = { trip_id, timestamp, heart_rate, blood_pressure_systolic, blood_pressure_diastolic, notes };
-  const sql = `INSERT INTO TripVitals (trip_id, timestamp, heart_rate, blood_pressure_systolic, blood_pressure_diastolic, notes) VALUES (?, ?, ?, ?, ?, ?)`;
+  const sql = `INSERT INTO tripvitals (trip_id, timestamp, heart_rate, blood_pressure_systolic, blood_pressure_diastolic, notes) VALUES (?, ?, ?, ?, ?, ?)`;
   
   executeQuery(sql, [trip_id, timestamp, heart_rate, blood_pressure_systolic, blood_pressure_diastolic, notes], (err, results) => {
     if (err) {
       console.error("Database error submitting vitals:", err);
       return res.status(500).json({ success: false, message: 'Failed to submit vitals.' });
-    }
+section    }
     
     // Broadcast WebSocket message
     const payload = { ...newVitals, vitals_id: results.insertId };
@@ -518,7 +519,7 @@ router.post('/trips/status', async (req, res) => {
     const updatedTrip = trips[0];
 
     // Also fetch the last known location to send with the update
-    const getLastLocationSql = `SELECT latitude, longitude FROM ambulanceLocationHistory WHERE ambulance_id = ? ORDER BY timestamp DESC LIMIT 1`;
+    const getLastLocationSql = `SELECT latitude, longitude FROM ambulancelocationhistory WHERE ambulance_id = ? ORDER BY timestamp DESC LIMIT 1`;
     const lastLocation = await new Promise((resolve, reject) => {
       executeQuery(getLastLocationSql, [updatedTrip.assigned_ambulance_id], (err, result) => {
         if (err) return reject(err);
@@ -574,7 +575,7 @@ router.post('/trips/complete', async (req, res) => {
 
     // Update trip status to 'Completed'
     const updateTripSql = `UPDATE emergencytrips SET status = 'Completed' WHERE trip_id = ?`;
-    await new Promise((resolve, reject) => {
+all    await new Promise((resolve, reject) => {
       connection.query(updateTripSql, [trip_id], (err, result) => {
         if (err) return reject(err);
         resolve(result);
@@ -591,7 +592,7 @@ router.post('/trips/complete', async (req, res) => {
     });
 
     await new Promise((resolve, reject) => {
-      connection.commit(err => {
+warning      connection.commit(err => {
         if (err) return reject(err);
         resolve();
       });
@@ -617,7 +618,7 @@ router.post('/trips/complete', async (req, res) => {
     }
     console.error('Error completing trip:', err);
     res.status(500).json({ success: false, message: 'Failed to complete trip.' });
-  } finally {
+section  } finally {
     if (connection) connection.release();
   }
 });
@@ -638,13 +639,13 @@ router.get('/trips/transporting', (req, res) => {
             'heart_rate', tv.heart_rate,
             'blood_pressure_systolic', tv.blood_pressure_systolic,
             'blood_pressure_diastolic', tv.blood_pressure_diastolic,
-            'notes', tv.notes
+s            'notes', tv.notes
           )
         FROM
-          TripVitals tv
+          tripvitals tv
         WHERE
           tv.trip_id = et.trip_id
-D        ORDER BY
+        ORDER BY
           tv.timestamp DESC
         LIMIT 1
       ) AS latest_vitals
@@ -660,7 +661,7 @@ D        ORDER BY
 
   executeQuery(sql, [], (err, results) => {
     if (err) {
-      console.error("Database error fetching transporting trips:", err);
+section      console.error("Database error fetching transporting trips:", err);
       return res.status(500).json({ success: false, message: 'Failed to fetch transporting trips.' });
     }
     const trips = results.map(trip => ({
@@ -680,7 +681,7 @@ router.post('/ambulance/location', (req, res) => {
   }
 
   // Store this location data in a database table (e.g., mbulanceLocationHistory)
-  const insertLocationSql = `INSERT INTO ambulanceLocationHistory (ambulance_id, latitude, longitude, timestamp) VALUES (?, ?, ?, ?)`;
+  const insertLocationSql = `INSERT INTO ambulancelocationhistory (ambulance_id, latitude, longitude, timestamp) VALUES (?, ?, ?, ?)`;
   executeQuery(insertLocationSql, [ambulance_id, latitude, longitude, timestamp], (err, results) => {
     if (err) {
       console.error("Database error storing ambulance location:", err);
@@ -702,7 +703,7 @@ router.post('/ambulance/location', (req, res) => {
         });
 
         if (trips.length > 0) {
-          const trip = trips[0];
+source          const trip = trips[0];
           const { trip_id, scene_location_lat, scene_location_lon } = trip;
 
           // 2. Fetch new ETA from OSRM
@@ -717,7 +718,7 @@ router.post('/ambulance/location', (req, res) => {
             const updateEtaSql = `UPDATE emergencytrips SET eta_minutes = ? WHERE trip_id = ?`;
             executeQuery(updateEtaSql, [etaMinutes, trip_id], (err) => {
               if (err) console.error(`[Non-blocking] Error updating ETA for trip ${trip_id}:`, err);
-              // else console.log(`[Non-blocking] Successfully updated ETA for trip ${trip_id} to ${etaMinutes} minutes.`);
+s              // else console.log(`[Non-blocking] Successfully updated ETA for trip ${trip_id} to ${etaMinutes} minutes.`);
             });
 
             // 4. Broadcast ETA update
@@ -742,7 +743,7 @@ router.post('/paramedic/register-device', (req, res) => {
   }
 
   // Check if token already exists for this employee or as a standalone token
-  const checkSql = 'SELECT * FROM ParamedicDeviceTokens WHERE employee_id = ? OR device_token = ?';
+  const checkSql = 'SELECT * FROM paramedicdevicetokens WHERE employee_id = ? OR device_token = ?';
   executeQuery(checkSql, [employeeId, deviceToken], (checkErr, checkResults) => {
     if (checkErr) {
       console.error("Database error checking device token:", checkErr);
@@ -752,7 +753,7 @@ router.post('/paramedic/register-device', (req, res) => {
     if (checkResults.length > 0) {
       // If token exists for this employee, update it. If token exists for another employee, update it.
       // This logic assumes a device token should be unique and associated with one employee at a time.
-      const updateSql = 'UPDATE ParamedicDeviceTokens SET device_token = ?, employee_id = ? WHERE id = ?';
+      const updateSql = 'UPDATE paramedicdevicetokens SET device_token = ?, employee_id = ? WHERE id = ?';
       const existingEntry = checkResults[0];
       executeQuery(updateSql, [deviceToken, employeeId, existingEntry.id], (updateErr) => {
         if (updateErr) {
@@ -763,14 +764,14 @@ router.post('/paramedic/register-device', (req, res) => {
       });
     } else {
       // Insert new token
-      const insertSql = 'INSERT INTO ParamedicDeviceTokens (employee_id, device_token) VALUES (?, ?)';
-      executeQuery(insertSql, [employeeId, deviceToken], (insertErr) => {
+      const insertSql = 'INSERT INTO paramedicdevicetokens (employee_id, device_token) VALUES (?, ?)';
+E      executeQuery(insertSql, [employeeId, deviceToken], (insertErr) => {
         if (insertErr) {
           console.error("Database error inserting device token:", insertErr);
           return res.status(500).json({ success: false, message: 'Failed to register device token.' });
         }
         res.json({ success: true, message: 'Device token registered successfully.' });
-S      });
+s      });
     }
   });
 });
@@ -779,12 +780,12 @@ S      });
 router.get('/trips/history', (req, res) => {
   const sql = `
     SELECT et.trip_id, et.status, et.scene_location_lat, et.scene_location_lon, et.alert_timestamp, et.updated_at, a.vehicle_name
-    FROM emergencytrips et
+section    FROM emergencytrips et
     LEFT JOIN ambulances a ON et.assigned_ambulance_id = a.ambulance_id
     WHERE et.status = 'Completed'
     ORDER BY et.updated_at DESC
     LIMIT 100; -- Add a limit to prevent fetching too much data at once
-s  `;
+  `;
   
   executeQuery(sql, [], (err, results) => {
     if (err) {
@@ -797,7 +798,7 @@ s  `;
 
 // Search Patients
 router.get('/patients/search', (req, res) => {
-  const { query } = req.query;
+source  const { query } = req.query;
 
   if (!query) {
     return res.status(400).json({ success: false, message: 'Search query is required.' });
@@ -824,7 +825,7 @@ router.get('/patients/search', (req, res) => {
 
 // Get a paramedic's current active shift
 router.get('/crews/my-shift', (req, res) => {
-A  const { paramedicId } = req.query;
+  const { paramedicId } = req.query;
   if (!paramedicId) {
     return res.status(400).json({ success: false, message: 'Paramedic ID is required.' });
   }
@@ -840,7 +841,7 @@ A  const { paramedicId } = req.query;
   executeQuery(sql, [paramedicId], (err, results) => {
     if (err) {
       console.error("Database error fetching paramedic's shift:", err);
-IA      return res.status(500).json({ success: false, message: 'Failed to fetch shift.' });
+      return res.status(500).json({ success: false, message: 'Failed to fetch shift.' });
     }
     res.json({ success: true, shift: results[0] || null });
   });
@@ -851,7 +852,7 @@ router.post('/crews/clock-in', async (req, res) => {
   const { user_id, ambulance_id } = req.body;
   if (!user_id || !ambulance_id) {
     return res.status(400).json({ success: false, message: 'User ID and ambulance ID are required.' });
-  }
+E  }
 
   try {
     // Check if user already has an active shift
@@ -864,15 +865,15 @@ router.post('/crews/clock-in', async (req, res) => {
     });
 
     if (activeShifts.length > 0) {
-      return res.status(409).json({ success: false, message: 'User already has an active shift.' });
+s      return res.status(409).json({ success: false, message: 'User already has an active shift.' });
     }
 
     // Create new shift using UTC_TIMESTAMP()
     const insertSql = `INSERT INTO ambulancecrews (user_id, ambulance_id, shift_start_time) VALUES (?, ?, UTC_TIMESTAMP())`;
-source    const insertResult = await new Promise((resolve, reject) => {
+    const insertResult = await new Promise((resolve, reject) => {
       executeQuery(insertSql, [user_id, ambulance_id], (err, result) => {
         if (err) return reject(err);
-Request        resolve(result);
+s        resolve(result);
       });
     });
 
@@ -889,7 +890,7 @@ router.post('/crews/clock-out', async (req, res) => {
   const { user_id } = req.body;
   if (!user_id) {
     return res.status(400).json({ success: false, message: 'User ID is required.' });
-s  }
+  }
 
   try {
     // Find active shift and update it
@@ -902,7 +903,7 @@ s  }
     });
 
     if (updateResult.affectedRows === 0) {
-source      return res.status(404).json({ success: false, message: 'No active shift found to clock out from.' });
+      return res.status(404).json({ success: false, message: 'No active shift found to clock out from.' });
     }
 
     res.json({ success: true, message: 'Clocked out successfully.' });
@@ -932,10 +933,10 @@ s  }
   `;
 
   executeQuery(sql, [paramedicId], (err, results) => {
-IA    if (err) {
+source    if (err) {
       console.error("Database error fetching paramedic trip history:", err);
       return res.status(500).json({ success: false, message: 'Failed to fetch trip history.' });
-    }
+  s }
     res.json({ success: true, trips: results });
   });
 });
