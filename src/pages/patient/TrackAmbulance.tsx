@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import apiUrl from '../../config/api';
+import useWebSocket from '../../hooks/useWebSocket'; // Import the WebSocket hook
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -15,15 +16,54 @@ const TrackAmbulance = ({ user }) => {
   const [error, setError] = useState('');
   const [isCancelling, setIsCancelling] = useState(false);
   const [cancellationSuccess, setCancellationSuccess] = useState(false);
-  const intervalRef = useRef(null);
+  const [eta, setEta] = useState(null);
+  const [ambulanceLocation, setAmbulanceLocation] = useState(null);
+
+  const handleWebSocketMessage = useCallback((message) => {
+    const { type, payload } = message;
+
+    if (payload.trip_id && payload.trip_id !== tripId) {
+      // This update is not for the current trip
+      return;
+    }
+
+    switch (type) {
+      case 'TRIP_STATUS_UPDATE':
+        setTrip(prevTrip => ({ ...prevTrip, ...payload.trip }));
+        break;
+      case 'AMBULANCE_LOCATION_UPDATE':
+        if (trip && payload.ambulance_id === trip.assigned_ambulance_id) {
+          setAmbulanceLocation({ latitude: payload.latitude, longitude: payload.longitude });
+        }
+        break;
+      case 'TRIP_ETA_UPDATE':
+        setEta(payload.eta_minutes);
+        break;
+      case 'TRIP_COMPLETED':
+        // The trip is over, navigate away after a short delay
+        setTimeout(() => navigate('/patient-dashboard'), 3000);
+        break;
+      default:
+        break;
+    }
+  }, [tripId, trip]);
+
+  useWebSocket(handleWebSocketMessage);
 
   const fetchTripStatus = async () => {
     if (!user || !user.id) return;
     try {
       const response = await fetch(apiUrl(`/api/ems/patient/my-trip-status?patientId=${user.id}`));
       const data = await response.json();
-      if (data.success) {
+      if (data.success && data.trip) {
         setTrip(data.trip);
+        setEta(data.trip.eta_minutes);
+        if (data.trip.ambulance_latitude && data.trip.ambulance_longitude) {
+          setAmbulanceLocation({
+            latitude: data.trip.ambulance_latitude,
+            longitude: data.trip.ambulance_longitude,
+          });
+        }
         if (!data.trip && !cancellationSuccess) {
           setError('Could not find an active trip. It may have been completed or cancelled.');
         }
@@ -53,9 +93,6 @@ const TrackAmbulance = ({ user }) => {
       });
       const data = await response.json();
       if (data.success) {
-        if (intervalRef.current) {
-          clearInterval(intervalRef.current);
-        }
         setCancellationSuccess(true);
         setTimeout(() => {
           navigate('/patient-dashboard');
@@ -73,12 +110,6 @@ const TrackAmbulance = ({ user }) => {
   useEffect(() => {
     if (user && user.id) {
       fetchTripStatus();
-      intervalRef.current = setInterval(fetchTripStatus, 10000); // Poll every 10 seconds
-      return () => {
-        if (intervalRef.current) {
-          clearInterval(intervalRef.current);
-        }
-      };
     }
   }, [user]);
 
@@ -123,8 +154,6 @@ const TrackAmbulance = ({ user }) => {
       </div>
     );
   }
-
-  const ambulanceLocation = trip?.ambulance_latitude ? { latitude: trip.ambulance_latitude, longitude: trip.ambulance_longitude } : null;
 
   const getStatusMessage = (status) => {
     switch (status) {
@@ -175,6 +204,7 @@ const TrackAmbulance = ({ user }) => {
                 <AlertDescription>
                   {getStatusMessage(trip.status)}
                 </AlertDescription>
+                <p className="font-bold mt-2">ETA: {eta ? `${eta} minutes` : 'Calculating...'}</p>
               </Alert>
 
               {trip.paramedic_firstName && (
