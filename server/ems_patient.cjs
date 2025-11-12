@@ -48,13 +48,13 @@ async function autoDispatchTrip(trip_id, scene_location, wss) {
       SELECT
         a.ambulance_id,
         a.vehicle_name,
-        (SELECT alh.latitude FROM AmbulanceLocationHistory alh WHERE alh.ambulance_id = a.ambulance_id ORDER BY alh.timestamp DESC LIMIT 1) as last_latitude,
-        (SELECT alh.longitude FROM AmbulanceLocationHistory alh WHERE alh.ambulance_id = a.ambulance_id ORDER BY alh.timestamp DESC LIMIT 1) as last_longitude
-      FROM Ambulances a
+        (SELECT alh.latitude FROM ambulancelocationhistory alh WHERE alh.ambulance_id = a.ambulance_id ORDER BY alh.timestamp DESC LIMIT 1) as last_latitude,
+        (SELECT alh.longitude FROM ambulancelocationhistory alh WHERE alh.ambulance_id = a.ambulance_id ORDER BY alh.timestamp DESC LIMIT 1) as last_longitude
+      FROM ambulances a
       WHERE a.current_status = 'Available'
       AND a.ambulance_id IN (
         SELECT DISTINCT ac.ambulance_id
-        FROM AmbulanceCrews ac
+        FROM ambulancecrews ac
         WHERE ac.shift_end_time IS NULL
       );
     `;
@@ -94,7 +94,7 @@ async function autoDispatchTrip(trip_id, scene_location, wss) {
     // 4. Assign the trip
     const assignment_timestamp = new Date();
     const assignSql = `
-      UPDATE EmergencyTrips
+      UPDATE emergencytrips
       SET status = 'Assigned', assigned_ambulance_id = ?, assignment_timestamp = ?
       WHERE trip_id = ?;
     `;
@@ -106,7 +106,7 @@ async function autoDispatchTrip(trip_id, scene_location, wss) {
     });
 
     // 5. Update ambulance status
-    const updateAmbulanceSql = `UPDATE Ambulances SET current_status = 'On_Trip' WHERE ambulance_id = ?`;
+    const updateAmbulanceSql = `UPDATE ambulances SET current_status = 'On_Trip' WHERE ambulance_id = ?`;
     await new Promise((resolve, reject) => {
       executeQuery(updateAmbulanceSql, [closestAmbulance.ambulance_id], (err, result) => {
         if (err) return reject(err);
@@ -115,7 +115,7 @@ async function autoDispatchTrip(trip_id, scene_location, wss) {
     });
 
     // 6. Insert initial location into history
-    const insertLocationSql = `INSERT INTO AmbulanceLocationHistory (ambulance_id, latitude, longitude, timestamp) VALUES (?, ?, ?, ?)`;
+    const insertLocationSql = `INSERT INTO ambulancelocationhistory (ambulance_id, latitude, longitude, timestamp) VALUES (?, ?, ?, ?)`;
     await new Promise((resolve, reject) => {
         executeQuery(insertLocationSql, [closestAmbulance.ambulance_id, closestAmbulance.last_latitude, closestAmbulance.last_longitude, new Date()], (err, result) => {
             if (err) return reject(err);
@@ -174,7 +174,7 @@ router.post('/book-ambulance', async (req, res) => {
       alert_timestamp
     };
 
-    const sql = `INSERT INTO EmergencyTrips (trip_id, status, alert_source, scene_location_lat, scene_location_lon, patient_name, notes, patient_id, booked_by_patient_id, alert_timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    const sql = `INSERT INTO emergencytrips (trip_id, status, alert_source, scene_location_lat, scene_location_lon, patient_name, notes, patient_id, booked_by_patient_id, alert_timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
     
     await new Promise((resolve, reject) => {
       executeQuery(sql, [trip_id, 'New_Alert', 'Patient_App', latitude, longitude, newTrip.patient_name, notes, patient_id, patient_id, alert_timestamp], (err, results) => {
@@ -214,16 +214,16 @@ router.get('/my-trip-status', async (req, res) => {
                 u.firstName as paramedic_firstName,
                 u.lastName as paramedic_lastName,
                 u.phone as paramedic_phone,
-                (SELECT alh.latitude FROM AmbulanceLocationHistory alh WHERE alh.ambulance_id = et.assigned_ambulance_id ORDER BY alh.timestamp DESC LIMIT 1) as ambulance_latitude,
-                (SELECT alh.longitude FROM AmbulanceLocationHistory alh WHERE alh.ambulance_id = et.assigned_ambulance_id ORDER BY alh.timestamp DESC LIMIT 1) as ambulance_longitude
-            FROM EmergencyTrips et
-            LEFT JOIN Ambulances a ON et.assigned_ambulance_id = a.ambulance_id
+                (SELECT alh.latitude FROM ambulancelocationhistory alh WHERE alh.ambulance_id = et.assigned_ambulance_id ORDER BY alh.timestamp DESC LIMIT 1) as ambulance_latitude,
+                (SELECT alh.longitude FROM ambulancelocationhistory alh WHERE alh.ambulance_id = et.assigned_ambulance_id ORDER BY alh.timestamp DESC LIMIT 1) as ambulance_longitude
+            FROM emergencytrips et
+            LEFT JOIN ambulances a ON et.assigned_ambulance_id = a.ambulance_id
             LEFT JOIN (
                 SELECT ac1.*
-                FROM AmbulanceCrews ac1
+                FROM ambulancecrews ac1
                 INNER JOIN (
                     SELECT ambulance_id, MAX(shift_start_time) as max_start
-                    FROM AmbulanceCrews
+                    FROM ambulancecrews
                     WHERE shift_end_time IS NULL
                     GROUP BY ambulance_id
                 ) ac2 ON ac1.ambulance_id = ac2.ambulance_id AND ac1.shift_start_time = ac2.max_start
@@ -257,7 +257,7 @@ router.post('/cancel-trip', async (req, res) => {
 
     try {
         // Get the assigned ambulance_id before updating the trip
-        const getTripSql = `SELECT assigned_ambulance_id FROM EmergencyTrips WHERE trip_id = ?`;
+        const getTripSql = `SELECT assigned_ambulance_id FROM emergencytrips WHERE trip_id = ?`;
         const trip = await new Promise((resolve, reject) => {
             executeQuery(getTripSql, [trip_id], (err, result) => {
                 if (err) return reject(err);
@@ -268,7 +268,7 @@ router.post('/cancel-trip', async (req, res) => {
         const { assigned_ambulance_id } = trip;
 
         // Update trip status to 'Cancelled'
-        const updateTripSql = `UPDATE EmergencyTrips SET status = 'Cancelled' WHERE trip_id = ?`;
+        const updateTripSql = `UPDATE emergencytrips SET status = 'Cancelled' WHERE trip_id = ?`;
         await new Promise((resolve, reject) => {
             executeQuery(updateTripSql, [trip_id], (err, result) => {
                 if (err) return reject(err);
@@ -278,7 +278,7 @@ router.post('/cancel-trip', async (req, res) => {
 
         // If an ambulance was assigned, update its status to 'Available'
         if (assigned_ambulance_id) {
-            const updateAmbulanceSql = `UPDATE Ambulances SET current_status = 'Available', current_trip_id = NULL WHERE ambulance_id = ?`;
+            const updateAmbulanceSql = `UPDATE ambulances SET current_status = 'Available', current_trip_id = NULL WHERE ambulance_id = ?`;
             await new Promise((resolve, reject) => {
                 executeQuery(updateAmbulanceSql, [assigned_ambulance_id], (err, result) => {
                     if (err) return reject(err);
