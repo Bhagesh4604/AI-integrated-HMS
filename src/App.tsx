@@ -119,17 +119,8 @@ const MainApplication = ({ user, onLogout, updateUser }) => {
 // --- Root App Component ---
 function App() {
   const [loggedInUser, setLoggedInUser] = useState(null);
-  const [loading, setLoading] = useState(true); // Add a loading state
   const navigate = useNavigate();
   const location = useLocation();
-
-  useEffect(() => {
-    const storedUser = localStorage.getItem('loggedInUser');
-    if (storedUser) {
-      setLoggedInUser(JSON.parse(storedUser));
-    }
-    setLoading(false); // Set loading to false after checking localStorage
-  }, []);
 
   const navigateToDashboard = useCallback((user) => {
     switch (user.role) {
@@ -178,11 +169,6 @@ function App() {
     localStorage.setItem('loggedInUser', JSON.stringify(updatedUser));
     setLoggedInUser(updatedUser);
   };
-
-  // Render a loading indicator while checking for user
-  if (loading) {
-    return <div className="flex items-center justify-center h-screen">Loading...</div>;
-  }
 
   return (
     <Routes>
