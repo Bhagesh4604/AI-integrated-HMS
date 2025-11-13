@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import useWebSocket from '../hooks/useWebSocket';
 import AddAmbulanceForm from '../components/ems/AddAmbulanceForm';
+import { Sparkles } from 'lucide-react';
 
 const TripHistoryView = ({ trips, isLoading, error }) => {
   console.log('[TripHistoryView] Rendering with props:', { trips, isLoading, error });
@@ -60,8 +61,8 @@ const FleetManagementDashboard = () => {
   const [newAlerts, setNewAlerts] = useState([]);
   const [activeTrips, setActiveTrips] = useState([]);
   const [fleetStatus, setFleetStatus] = useState([]);
-  const [ambulanceLocations, setAmbulanceLocations] = useState({}); // New state for ambulance locations
-  const [destinations, setDestinations] = useState({}); // New state for trip destinations
+  const [ambulanceLocations, setAmbulanceLocations] = useState({});
+  const [destinations, setDestinations] = useState({});
   const [loadingAlerts, setLoadingAlerts] = useState(true);
   const [errorAlerts, setErrorAlerts] = useState('');
 
@@ -80,7 +81,6 @@ const FleetManagementDashboard = () => {
   const [creatingManualAlert, setCreatingManualAlert] = useState(false);
   const [manualAlertError, setManualAlertError] = useState('');
 
-  // New state for Patient Search in Manual Alert
   const [patientSearchQuery, setPatientSearchQuery] = useState('');
   const [patientSearchResults, setPatientSearchResults] = useState([]);
   const [selectedPatient, setSelectedPatient] = useState(null);
@@ -89,9 +89,13 @@ const FleetManagementDashboard = () => {
 
   const [showAddAmbulanceModal, setShowAddAmbulanceModal] = useState(false);
 
+  // AI Summary State
+  const [alertSummaries, setAlertSummaries] = useState({});
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState({});
+
   const handlePatientSearch = async (query) => {
     setPatientSearchQuery(query);
-    if (query.length < 3) { // Only search if query is at least 3 characters
+    if (query.length < 3) {
       setPatientSearchResults([]);
       return;
     }
@@ -116,18 +120,16 @@ const FleetManagementDashboard = () => {
   const handleSelectPatient = (patient) => {
     setSelectedPatient(patient);
     setPatientSearchQuery(`${patient.firstName} ${patient.lastName} (${patient.patientId})`);
-    setPatientSearchResults([]); // Clear results after selection
+    setPatientSearchResults([]);
   };
 
-  // New state for Trip History
-  const [view, setView] = useState('live'); // 'live' or 'history'
+  const [view, setView] = useState('live');
   const [tripHistory, setTripHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [errorHistory, setErrorHistory] = useState('');
 
   const handleToggleView = () => {
     const newView = view === 'live' ? 'history' : 'live';
-    console.log(`[handleToggleView] Switching view to: ${newView}`);
     setView(newView);
     if (newView === 'history') {
       fetchTripHistory();
@@ -154,13 +156,11 @@ const FleetManagementDashboard = () => {
   };
 
   const fetchTripHistory = async () => {
-    console.log('[fetchTripHistory] Fetching trip history...');
     setLoadingHistory(true);
     setErrorHistory('');
     try {
       const response = await fetch(apiUrl('/api/ems/trips/history'));
       const data = await response.json();
-      console.log('[fetchTripHistory] Received data:', data);
       if (data.success) {
         setTripHistory(data.trips);
       } else {
@@ -206,7 +206,7 @@ const FleetManagementDashboard = () => {
               newLocations[trip.assigned_ambulance_id] = {
                 lat: trip.last_latitude,
                 lng: trip.last_longitude,
-                timestamp: new Date().toISOString(), // Note: This timestamp is from the fetch time
+                timestamp: new Date().toISOString(),
                 vehicle_name: trip.vehicle_name,
               };
             }
@@ -284,7 +284,6 @@ const FleetManagementDashboard = () => {
         setShowAssignModal(false);
         setSelectedAlert(null);
         setSelectedAmbulanceId('');
-        // No longer need to fetch fleet status here, WebSocket will handle it
       } else {
         setAssignError(data.message || 'Failed to assign trip.');
       }
@@ -313,7 +312,7 @@ const FleetManagementDashboard = () => {
           scene_location_lon: parseFloat(manualLon),
           patient_name: selectedPatient ? `${selectedPatient.firstName} ${selectedPatient.lastName}` : manualPatientName,
           notes: manualNotes,
-          patient_id: selectedPatient ? selectedPatient.id : null, // Include patient_id
+          patient_id: selectedPatient ? selectedPatient.id : null,
         }),
       });
       const data = await response.json();
@@ -323,9 +322,9 @@ const FleetManagementDashboard = () => {
         setManualLon('');
         setManualPatientName('');
         setManualNotes('');
-        setPatientSearchQuery(''); // Clear search
-        setPatientSearchResults([]); // Clear results
-        setSelectedPatient(null); // Clear selected patient
+        setPatientSearchQuery('');
+        setPatientSearchResults([]);
+        setSelectedPatient(null);
       } else {
         setManualAlertError(data.message || 'Failed to create manual alert.');
       }
@@ -334,6 +333,40 @@ const FleetManagementDashboard = () => {
       setManualAlertError('Failed to connect to the server to create manual alert.');
     } finally {
       setCreatingManualAlert(false);
+    }
+  };
+
+  const handleGenerateSummary = async (alert) => {
+    if (!alert || isGeneratingSummary[alert.trip_id] || alertSummaries[alert.trip_id]) return;
+
+    setIsGeneratingSummary(prev => ({ ...prev, [alert.trip_id]: true }));
+
+    const systemPrompt = "You are an expert EMS dispatcher AI. Your role is to provide a quick 'Potential Incident Profile' based on limited initial alert data. Be concise. Structure your response with 'Likely Scenario:', 'Suggested Questions:', and 'Initial Recommendation:'.";
+    const userQuery = `
+      New alert received.
+      - Location (Lat/Lon): ${alert.scene_location_lat}, ${alert.scene_location_lon}
+      - Time: ${new Date(alert.alert_timestamp).toLocaleString()}
+      - Initial Notes: "${alert.notes || 'No initial notes provided.'}"
+
+      Provide a Potential Incident Profile.
+    `;
+
+    try {
+      const response = await fetch(apiUrl('/api/ai/ask'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userQuery }]
+        }),
+      });
+      if (!response.ok) throw new Error('AI service request failed');
+      const result = await response.json();
+      setAlertSummaries(prev => ({ ...prev, [alert.trip_id]: result.reply || "Could not generate summary." }));
+    } catch (error) {
+      console.error("AI Summary error:", error);
+      setAlertSummaries(prev => ({ ...prev, [alert.trip_id]: "Error generating summary." }));
+    } finally {
+      setIsGeneratingSummary(prev => ({ ...prev, [alert.trip_id]: false }));
     }
   };
 
@@ -351,7 +384,6 @@ const FleetManagementDashboard = () => {
       if (!data.success) {
         console.error('Failed to complete trip:', data.message);
       }
-      // UI update will be handled by WebSocket
     } catch (error) {
       console.error('Error completing trip:', error);
     } finally {
@@ -403,28 +435,22 @@ const FleetManagementDashboard = () => {
 
     switch (type) {
       case 'NEW_ALERT':
-        console.log('NEW_ALERT received, payload:', payload);
         setNewAlerts(prevAlerts => [payload, ...prevAlerts]);
         break;
       case 'TRIP_ASSIGNED':
-        console.log('TRIP_ASSIGNED received, payload:', payload);
         const { trip, ambulance, lastLocation } = payload;
-        // Remove from new alerts
         setNewAlerts(prevAlerts => prevAlerts.filter(alert => alert.trip_id !== trip.trip_id));
-        // Add to active trips, preventing duplicates
         setActiveTrips(prevTrips => {
           if (prevTrips.some(t => t.trip_id === trip.trip_id)) {
             return prevTrips;
           }
           return [trip, ...prevTrips];
         });
-        // Update fleet status
         setFleetStatus(prevFleet => 
           prevFleet.map(amb => 
             amb.ambulance_id === ambulance.ambulance_id ? ambulance : amb
           )
         );
-        // Set initial location if available
         if (lastLocation) {
           setAmbulanceLocations(prevLocations => ({
             ...prevLocations,
@@ -436,7 +462,6 @@ const FleetManagementDashboard = () => {
             },
           }));
         }
-        // Set destination for the trip
         setDestinations(prevDestinations => ({
           ...prevDestinations,
           [ambulance.ambulance_id]: {
@@ -446,7 +471,6 @@ const FleetManagementDashboard = () => {
         }));
         break;
       case 'TRIP_ETA_UPDATE':
-        console.log('TRIP_ETA_UPDATE received, payload:', payload);
         setActiveTrips(prevTrips =>
           prevTrips.map(t =>
             t.trip_id === payload.trip_id ? { ...t, eta_minutes: payload.eta_minutes } : t
@@ -454,11 +478,10 @@ const FleetManagementDashboard = () => {
         );
         break;
       case 'AMBULANCE_LOCATION_UPDATE':
-        console.log('AMBULANCE_LOCATION_UPDATE received, payload:', payload);
         setAmbulanceLocations(prevLocations => ({
           ...prevLocations,
           [payload.ambulance_id]: {
-            ...prevLocations[payload.ambulance_id], // Preserve existing data like vehicle_name
+            ...prevLocations[payload.ambulance_id],
             lat: payload.latitude,
             lng: payload.longitude,
             timestamp: payload.timestamp,
@@ -466,23 +489,17 @@ const FleetManagementDashboard = () => {
         }));
         break;
       case 'TRIP_STATUS_UPDATE':
-        console.log('TRIP_STATUS_UPDATE received, payload:', payload);
-        // This handles status changes like 'En_Route_To_Scene', 'At_Scene', 'At_Hospital'
         setActiveTrips(prevTrips =>
           prevTrips.map(t => (t.trip_id === payload.trip.trip_id ? payload.trip : t))
         );
         break;
       case 'TRIP_COMPLETED':
-        console.log('TRIP_COMPLETED received, payload:', payload);
-        // Remove from active trips
         setActiveTrips(prevTrips => prevTrips.filter(t => t.trip_id !== payload.trip_id));
-        // Update fleet status
         setFleetStatus(prevFleet => 
           prevFleet.map(amb => 
             amb.ambulance_id === payload.ambulance.ambulance_id ? payload.ambulance : amb
           )
         );
-        // Remove destination for the completed trip's ambulance
         setDestinations(prevDestinations => {
           const newDestinations = { ...prevDestinations };
           delete newDestinations[payload.ambulance.ambulance_id];
@@ -535,11 +552,9 @@ const FleetManagementDashboard = () => {
 
       {view === 'live' ? (
         <div className="flex flex-1 overflow-hidden">
-          {/* Left Panel: Alerts & Trips */}
           <aside className="w-1/4 bg-white dark:bg-gray-800 p-4 border-r border-gray-200 dark:border-gray-700 overflow-y-auto">
             <h2 className="text-xl font-semibold mb-4">Alerts & Trips</h2>
             <div className="space-y-4">
-              {/* New Alerts Section */}
               <div className="bg-red-100 dark:bg-red-900 p-3 rounded-md">
                 <h3 className="font-medium text-red-800 dark:text-red-200">New Alerts ({newAlerts.length})</h3>
                 {loadingAlerts ? (
@@ -553,19 +568,33 @@ const FleetManagementDashboard = () => {
                       <p className="text-sm">Status: {alert.status}</p>
                       <p className="text-sm">Location: {alert.scene_location_lat}, {alert.scene_location_lon}</p>
                       <p className="text-sm">Time: {new Date(alert.alert_timestamp).toLocaleString()}</p>
-                      <button 
-                        onClick={() => handleAssignClick(alert)}
-                        className="mt-2 px-3 py-1 bg-green-600 text-white rounded-md text-sm hover:bg-green-700"
-                      >
-                        Assign
-                      </button>
+                      <div className="flex gap-2 mt-2">
+                        <button 
+                          onClick={() => handleAssignClick(alert)}
+                          className="flex-1 px-3 py-1 bg-green-600 text-white rounded-md text-sm hover:bg-green-700"
+                        >
+                          Assign
+                        </button>
+                        <button
+                          onClick={() => handleGenerateSummary(alert)}
+                          disabled={isGeneratingSummary[alert.trip_id] || alertSummaries[alert.trip_id]}
+                          className="flex-1 px-3 py-1 bg-purple-600 text-white rounded-md text-sm hover:bg-purple-700 disabled:bg-gray-500 flex items-center justify-center gap-1"
+                        >
+                          <Sparkles size={14} /> AI Summary
+                        </button>
+                      </div>
+                      {isGeneratingSummary[alert.trip_id] && <p className="text-xs text-purple-700 dark:text-purple-300 mt-2 animate-pulse">Generating summary...</p>}
+                      {alertSummaries[alert.trip_id] && (
+                        <div className="mt-2 p-2 bg-purple-50 dark:bg-purple-900/50 rounded-md text-xs text-purple-800 dark:text-purple-200 whitespace-pre-wrap font-mono">
+                          {alertSummaries[alert.trip_id]}
+                        </div>
+                      )}
                     </div>
                   ))
                 ) : (
                   <p className="text-sm text-red-700 dark:text-red-300">No new alerts.</p>
                 )}
               </div>
-                          {/* Active Trips Section */}
                           <div className="bg-blue-100 dark:bg-blue-900 p-3 rounded-md">
                             <h3 className="font-medium text-blue-800 dark:text-blue-200">Active Trips ({activeTrips.length})</h3>
                             {activeTrips.length > 0 ? (
@@ -589,7 +618,6 @@ const FleetManagementDashboard = () => {
                           </div>          </div>
         </aside>
 
-          {/* Center Panel: Live Map */}
           <main className="flex-1 p-4">
             <h2 className="sr-only">Live Map</h2>
             <div className={`h-full w-full`}>
@@ -597,17 +625,13 @@ const FleetManagementDashboard = () => {
             </div>
           </main>
 
-          {/* Right Panel: Fleet Status */}
           <aside className="w-1/4 bg-white dark:bg-gray-800 p-4 border-l border-gray-200 dark:border-gray-700 overflow-y-auto">
             <h2 className="text-xl font-semibold mb-4">Fleet Status</h2>
             <div className="space-y-4">
-              {/* Ambulance Status Cards */}
               {fleetStatus.length > 0 ? (
               fleetStatus.map(ambulance => {
-                // Find the active trip for this ambulance, if any
                 const tripForAmbulance = activeTrips.find(t => t.assigned_ambulance_id === ambulance.ambulance_id);
                 
-                // Construct a more detailed status message if the ambulance is on a trip
                 const displayStatus = tripForAmbulance
                   ? `${ambulance.current_status.replace('_', ' ')} (${tripForAmbulance.status.replace('_', ' ')})`
                   : ambulance.current_status.replace('_', ' ');
@@ -661,7 +685,6 @@ const FleetManagementDashboard = () => {
         <TripHistoryView trips={tripHistory} isLoading={loadingHistory} error={errorHistory} />
       )}
 
-      {/* Assign Ambulance Modal */}
       <Dialog open={showAssignModal} onOpenChange={setShowAssignModal}>
         <DialogContent>
           <DialogHeader>
@@ -695,14 +718,12 @@ const FleetManagementDashboard = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Manual Alert Modal */}
       <Dialog open={showManualAlertModal} onOpenChange={setShowManualAlertModal}>
         <DialogContent className="z-[100]">
           <DialogHeader>
             <DialogTitle>Create Manual Emergency Alert</DialogTitle>
           </DialogHeader>
           <div className="p-4 space-y-4">
-            {/* Patient Search */}
             <div>
               <label htmlFor="patient-search" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Search Patient (Optional):
@@ -780,7 +801,7 @@ const FleetManagementDashboard = () => {
                 value={manualPatientName}
                 onChange={(e) => setManualPatientName(e.target.value)}
                 placeholder="e.g., John Doe"
-                disabled={!!selectedPatient} // Disable if patient is selected
+                disabled={!!selectedPatient}
               />
             </div>
             <div>

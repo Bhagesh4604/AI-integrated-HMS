@@ -62,3 +62,24 @@ Here is a comprehensive list of all the features in the Shree Medicare HMS appli
 - **Dark/Light Theme:** A modern UI with a theme toggle for user preference.
 - **Interactive UI Elements:** Engaging animations and UI elements like the "tuggable lamp" and stethoscope animations.
 - **Responsive Design:** The application is designed to work on both desktop and mobile devices.
+
+
+AI Features Added to Emergency Dashboards:
+
+1.  **ER Pre-Arrival Dashboard:**
+    *   **Feature:** AI Acuity Assessment.
+    *   **Description:** Each incoming patient card now includes an AI-generated assessment of the patient's likely condition, acuity level (Low, Moderate, High, Critical), and suggested preparations for the ER team, based on the latest vitals from the field.
+
+2.  **Paramedic Mode:**
+    *   **Feature:** AI Patient Handover Report.
+    *   **Description:** A new 'Handover' tab is available during an active trip. This allows the paramedic to generate a complete, structured SBAR (Situation, Background, Assessment, Recommendation) report using all the vitals and notes collected during the trip, ready to be read out to the ER staff upon arrival.
+
+3.  **Fleet Management Dashboard:**
+    *   **Feature:** AI Incident Summary.
+    *   **Description:** On each 'New Alert' card, dispatchers can now click a button to get an AI-generated 'Potential Incident Profile'. This provides a likely scenario, suggested questions for the caller, and an initial response recommendation based on the location and any initial notes.
+
+Files Modified:
+- src/pages/ERDashboard.tsx
+- src/pages/ParamedicMode.tsx
+- src/pages/FleetManagementDashboard.tsx
+- server/ems.cjs

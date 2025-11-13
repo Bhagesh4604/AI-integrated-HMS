@@ -68,19 +68,19 @@ router.get('/alerts/new', (req, res) => {
   });
 });
 
-// Get Available Ambulances for Clock-in
+// Get Available Ambulances for Trip Assignment
 router.get('/ambulances/available', (req, res) => {
   const sql = `
     SELECT
       a.ambulance_id,
       a.vehicle_name,
-      a.license_plate
+      a.license_plate,
+      e.firstName,
+      e.lastName
     FROM ambulances a
-    WHERE a.ambulance_id NOT IN (
-      SELECT DISTINCT ac.ambulance_id
-      FROM ambulancecrews ac
-      WHERE ac.shift_end_time IS NULL
-    )
+    LEFT JOIN ambulancecrews ac ON a.ambulance_id = ac.ambulance_id AND ac.shift_end_time IS NULL
+    LEFT JOIN employees e ON ac.user_id = e.id
+    WHERE a.current_status = 'Available'
   `;
   executeQuery(sql, [], (err, results) => {
     if (err) {
@@ -630,6 +630,8 @@ router.get('/trips/transporting', (req, res) => {
       et.*,
       a.vehicle_name,
       a.license_plate,
+      (SELECT alh.latitude FROM ambulancelocationhistory alh WHERE alh.ambulance_id = et.assigned_ambulance_id ORDER BY alh.timestamp DESC LIMIT 1) as last_latitude,
+      (SELECT alh.longitude FROM ambulancelocationhistory alh WHERE alh.ambulance_id = et.assigned_ambulance_id ORDER BY alh.timestamp DESC LIMIT 1) as last_longitude,
       (
         SELECT
           JSON_OBJECT(
@@ -911,6 +913,23 @@ router.post('/crews/clock-out', async (req, res) => {
     console.error("Database error during clock-out:", err);
     res.status(500).json({ success: false, message: 'Failed to clock out.' });
   }
+});
+
+// Get All Vitals for a Trip
+router.get('/trips/:trip_id/vitals', (req, res) => {
+  const { trip_id } = req.params;
+  if (!trip_id) {
+    return res.status(400).json({ success: false, message: 'Trip ID is required.' });
+  }
+
+  const sql = `SELECT * FROM tripvitals WHERE trip_id = ? ORDER BY timestamp ASC`;
+  executeQuery(sql, [trip_id], (err, results) => {
+    if (err) {
+      console.error("Database error fetching trip vitals:", err);
+      return res.status(500).json({ success: false, message: 'Failed to fetch trip vitals.' });
+    }
+    res.json({ success: true, vitals: results });
+  });
 });
 
 // Get a paramedic's trip history

@@ -4,7 +4,28 @@ import apiUrl from '@/config/api';
 import useGeolocation from '../hooks/useGeolocation';
 import ParamedicMapView from '../components/ems/ParamedicMapView';
 import usePushNotifications from '../hooks/usePushNotifications';
-import { Heart, Droplet, FileText, CheckCircle, AlertTriangle, MapPin, Navigation, Building, Flag, Clock, Ambulance, History, XCircle } from 'lucide-react';
+import { Heart, Droplet, FileText, CheckCircle, AlertTriangle, MapPin, Navigation, Building, Flag, Clock, Ambulance, History, XCircle, Sparkles, X } from 'lucide-react';
+
+const HandoverReportModal = ({ report, isLoading, onClose }) => (
+  <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 font-sans">
+    <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 w-full max-w-2xl border border-gray-300 dark:border-gray-700 shadow-2xl text-gray-900 dark:text-gray-100">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-2xl font-bold flex items-center gap-2"><Sparkles size={20} /> AI Handover Report</h2>
+        <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"><X size={20}/></button>
+      </div>
+      <div className="max-h-[70vh] overflow-y-auto p-4 bg-gray-100 dark:bg-gray-900 rounded-lg">
+        {isLoading ? (
+          <p className="text-center animate-pulse">Generating report...</p>
+        ) : (
+          <pre className="whitespace-pre-wrap font-sans text-sm">{report}</pre>
+        )}
+      </div>
+      <div className="flex justify-end mt-4">
+        <button onClick={onClose} className="px-6 py-2 bg-gray-600 text-white rounded-lg font-semibold hover:bg-gray-700">Close</button>
+      </div>
+    </div>
+  </div>
+);
 
 const TripHistoryView = ({ trips, onBack, isLoading, error }) => {
   if (isLoading) {
@@ -76,6 +97,11 @@ const ParamedicMode = ({ user }) => {
   const [statusError, setStatusError] = useState('');
   const [statusSuccess, setStatusSuccess] = useState('');
   
+  // AI Handover Report State
+  const [handoverReport, setHandoverReport] = useState('');
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [showHandoverModal, setShowHandoverModal] = useState(false);
+
   // UI State
   const [activeTab, setActiveTab] = useState('status');
 
@@ -301,6 +327,60 @@ const ParamedicMode = ({ user }) => {
     }
   };
 
+  const handleGenerateReport = async () => {
+    if (!myTrip) return;
+    setIsGeneratingReport(true);
+    setShowHandoverModal(true);
+    setHandoverReport('');
+
+    try {
+      // 1. Fetch all vitals for the trip
+      const vitalsResponse = await fetch(apiUrl(`/api/ems/trips/${myTrip.trip_id}/vitals`));
+      const vitalsData = await vitalsResponse.json();
+      if (!vitalsData.success) throw new Error('Failed to fetch vitals');
+      const allVitals = vitalsData.vitals;
+
+      // 2. Construct the prompt
+      const systemPrompt = "You are a paramedic assistant AI. Your task is to generate a concise, professional patient handover report for the ER staff using the SBAR (Situation, Background, Assessment, Recommendation) format. Be clear and to the point.";
+      const vitalsString = allVitals.map(v => 
+        `- Time: ${new Date(v.timestamp).toLocaleTimeString()}, HR: ${v.heart_rate || 'N/A'}, BP: ${v.blood_pressure_systolic || 'N/A'}/${v.blood_pressure_diastolic || 'N/A'}, Notes: "${v.notes || ''}"`
+      ).join('\n');
+
+      const userQuery = `
+        Generate an SBAR handover report for an incoming patient.
+        
+        Patient Information:
+        - Name: ${myTrip.patient_firstName || 'Unknown'} ${myTrip.patient_lastName || ''}
+        - DOB: ${myTrip.patient_dateOfBirth ? new Date(myTrip.patient_dateOfBirth).toLocaleDateString() : 'Unknown'}
+
+        Trip Information:
+        - Initial Alert Notes: "${myTrip.notes || 'N/A'}"
+
+        Chronological Vitals & Notes from the field:
+        ${allVitals.length > 0 ? vitalsString : "No vitals were recorded."}
+      `;
+
+      // 3. Call the AI service
+      const aiResponse = await fetch(apiUrl('/api/ai/ask'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userQuery }]
+        }),
+      });
+
+      if (!aiResponse.ok) throw new Error('AI service request failed');
+      const result = await aiResponse.json();
+      setHandoverReport(result.reply || "Could not generate report.");
+
+    } catch (error) {
+      console.error("Handover Report Generation Error:", error);
+      setHandoverReport("Error: Could not generate the handover report. Please review vitals manually.");
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
+
   useEffect(() => {
     if (user && user.id && user.role === 'ROLE_PARAMEDIC') {
       fetchMyShift();
@@ -405,6 +485,7 @@ const ParamedicMode = ({ user }) => {
 
   return (
     <div className="p-2 md:p-4 bg-gray-100 dark:bg-gray-900 min-h-screen text-gray-900 dark:text-gray-100 font-sans flex flex-col">
+      {showHandoverModal && <HandoverReportModal report={handoverReport} isLoading={isGeneratingReport} onClose={() => setShowHandoverModal(false)} />}
       {geoError && <div className="p-3 mb-4 bg-red-200 text-red-800 rounded-md text-sm">Geolocation Error: {geoError}</div>}
       {pushError && <div className="p-3 mb-4 bg-red-200 text-red-800 rounded-md text-sm">Push Notification Error: {pushError}</div>}
       
@@ -447,6 +528,7 @@ const ParamedicMode = ({ user }) => {
             <div className="flex border-b border-gray-200 dark:border-gray-700 mt-4">
               <TabButton tabName="status" label="Status" activeTab={activeTab} setActiveTab={setActiveTab} />
               <TabButton tabName="vitals" label="Vitals" activeTab={activeTab} setActiveTab={setActiveTab} />
+              <TabButton tabName="handover" label="Handover" activeTab={activeTab} setActiveTab={setActiveTab} />
               <TabButton tabName="nav" label="Navigate" activeTab={activeTab} setActiveTab={setActiveTab} />
             </div>
             <div className="p-3">
@@ -488,6 +570,15 @@ const ParamedicMode = ({ user }) => {
                   {vitalsSuccess && <p className="text-green-500 text-xs mt-2">{vitalsSuccess}</p>}
                   <button onClick={handleSubmitVitals} disabled={submittingVitals} className="mt-3 w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-500 flex items-center justify-center gap-2">
                     <CheckCircle size={18} /> {submittingVitals ? 'Sending...' : 'Send Vitals'}
+                  </button>
+                </div>
+              )}
+              {activeTab === 'handover' && (
+                <div>
+                  <h3 className="text-md font-bold mb-3 text-center">AI Patient Handover</h3>
+                  <p className="text-xs text-center text-gray-500 dark:text-gray-400 mb-3">Generate a structured SBAR report based on all recorded trip data.</p>
+                  <button onClick={handleGenerateReport} disabled={isGeneratingReport} className="w-full px-4 py-3 bg-purple-600 text-white font-bold rounded-lg hover:bg-purple-700 disabled:bg-gray-500 flex items-center justify-center gap-2">
+                    <Sparkles size={20} /> {isGeneratingReport ? 'Generating...' : 'Generate AI Handover Report'}
                   </button>
                 </div>
               )}

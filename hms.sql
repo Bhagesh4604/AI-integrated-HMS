@@ -1233,7 +1233,7 @@ ALTER TABLE `medical_records`
 --
 ALTER TABLE `medication_adherence`
   ADD PRIMARY KEY (`id`),
-  ADD KEY `patientId` (`patientId`),
+  ADD UNIQUE KEY `patientId_prescriptionId_doseTime` (`patientId`,`prescriptionId`,`doseTime`),
   ADD KEY `prescriptionId` (`prescriptionId`);
 
 --
