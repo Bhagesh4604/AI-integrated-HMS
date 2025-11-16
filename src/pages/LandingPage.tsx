@@ -280,7 +280,7 @@ export default function LandingPage() {
 
         <footer className="py-6 bg-background border-t border-border">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-muted-foreground">
-            <p className="text-sm">&copy; 2025 Shree Medicare . All Rights Reserved. Designed & Developed by 🤍 Bhagesh.</p>
+            <p className="text-sm">&copy; 2025 Shree Medicare . All Rights Reserved. Designed & Developed by 🤍 Bhagesh Biradar.</p>
           </div>
         </footer>
 
