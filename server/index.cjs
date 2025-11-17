@@ -12,10 +12,11 @@ const admin = require('firebase-admin'); // Import firebase-admin
 // For simplicity, we'll use a server key from .env for now.
 // In a production environment, a service account key file is recommended.
 if (process.env.FCM_SERVER_KEY) {
+  const privateKey = (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n');
   admin.initializeApp({
     credential: admin.credential.cert({
       projectId: process.env.FIREBASE_PROJECT_ID,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY,
+      privateKey: privateKey,
       clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
     }),
   });
