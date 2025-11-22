@@ -8,21 +8,33 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const admin = require('firebase-admin'); // Import firebase-admin
 
 // Initialize Firebase Admin SDK
-// You need to provide your Firebase service account key or server key
-// For simplicity, we'll use a server key from .env for now.
-// In a production environment, a service account key file is recommended.
-if (process.env.FCM_SERVER_KEY) {
-  const privateKey = (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n');
-  admin.initializeApp({
-    credential: admin.credential.cert({
+if (process.env.FIREBASE_SERVICE_ACCOUNT_BASE64) {
+  try {
+    const serviceAccountString = Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_BASE64, 'base64').toString('ascii');
+    const serviceAccount = JSON.parse(serviceAccountString);
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+    });
+    console.log("✅ Firebase Admin SDK initialized from Base64 variable.");
+  } catch (e) {
+    console.error("🔴 Firebase Admin SDK initialization from Base64 failed:", e);
+  }
+} else if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
+  try {
+    const serviceAccount = {
       projectId: process.env.FIREBASE_PROJECT_ID,
-      privateKey: privateKey,
+      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
       clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-    }),
-  });
-  console.log("✅ Firebase Admin SDK initialized.");
+    };
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+    });
+    console.log("✅ Firebase Admin SDK initialized from individual environment variables.");
+  } catch(e) {
+    console.error("🔴 Firebase Admin SDK initialization from individual env vars failed:", e);
+  }
 } else {
-  console.warn("⚠️ FCM_SERVER_KEY not found in .env. Push notifications will not be sent.");
+  console.warn("⚠️ Firebase credentials not found in environment variables. Push notifications will be disabled.");
 }
 
 
