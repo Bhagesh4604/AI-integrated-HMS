@@ -3,18 +3,25 @@ const router = express.Router();
 const { executeQuery } = require('./db.cjs');
 
 router.get('/stats', (req, res) => {
+    const today = new Date().toISOString().slice(0, 10);
     const queries = [
         "SELECT COUNT(*) as value FROM patients",
         "SELECT COUNT(*) as value FROM employees WHERE status = 'active'",
         "SELECT COUNT(*) as value FROM beds WHERE status = 'available'",
-        "SELECT SUM(amount) as value FROM accounts_receivable WHERE paymentStatus = 'paid' AND DATE(dueDate) = CURDATE()", // Corrected to revenue for today
+        `
+            SELECT SUM(total) as value FROM (
+                SELECT COALESCE(SUM(amount), 0) as total FROM accounts_receivable WHERE paymentStatus = 'paid' AND DATE(dueDate) = '${today}'
+                UNION ALL
+                SELECT COALESCE(SUM(totalAmount), 0) as total FROM patient_bills WHERE status = 'paid' AND DATE(billDate) = '${today}'
+            ) as combined_today
+        `,
     ];
 
     const promises = queries.map(sql => {
         return new Promise((resolve, reject) => {
             executeQuery(sql, [], (err, results) => {
                 if (err) return reject(err);
-                // Ensure value is not null
+                // Ensure value is not null, default to 0
                 resolve(results[0].value || 0);
             });
         });

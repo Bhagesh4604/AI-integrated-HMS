@@ -91,7 +91,7 @@ export default function Dashboard({ setActiveModule }) {
     { title: 'Total Patients', value: stats.totalPatients.toLocaleString(), icon: Users, color: 'text-pink-400', trend: "+5 this week" },
     { title: 'Active Staff', value: stats.activeStaff.toLocaleString(), icon: Stethoscope, color: 'text-blue-400' },
     { title: 'Available Beds', value: stats.availableBeds.toLocaleString(), icon: Bed, color: 'text-green-400' },
-    { title: 'Today\'s Revenue', value: `$${Number(stats.revenue).toLocaleString()}`, icon: DollarSign, color: 'text-teal-400', trend: "+$1.2k today" },
+    { title: 'Today\'s Revenue', value: `$${Number(stats.revenue || 0).toLocaleString()}`, icon: DollarSign, color: 'text-teal-400', trend: "+$1.2k today" },
   ];
 
   return (
