@@ -533,7 +533,8 @@ CREATE TABLE `lab_tests` (
   `testDate` date NOT NULL,
   `status` varchar(50) DEFAULT 'pending',
   `result_text` text DEFAULT NULL,
-  `result_file_url` varchar(255) DEFAULT NULL
+  `result_file_url` varchar(255) DEFAULT NULL,
+  `ai_analysis_json` longtext DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --

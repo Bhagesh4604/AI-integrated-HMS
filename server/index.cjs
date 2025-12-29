@@ -30,7 +30,7 @@ if (process.env.FIREBASE_SERVICE_ACCOUNT_BASE64) {
       credential: admin.credential.cert(serviceAccount),
     });
     console.log("✅ Firebase Admin SDK initialized from individual environment variables.");
-  } catch(e) {
+  } catch (e) {
     console.error("🔴 Firebase Admin SDK initialization from individual env vars failed:", e);
   }
 } else {
@@ -87,7 +87,17 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.static(path.join(__dirname, '..', 'public')));
+// Serve static files from the React app build directory
+app.use(express.static(path.join(__dirname, '..', 'dist')));
+
+// The "catchall" handler: for any request that doesn't
+// match one above, send back React's index.html file.
+app.get('*', (req, res, next) => {
+  if (req.url.startsWith('/api')) {
+    return next();
+  }
+  res.sendFile(path.join(__dirname, '..', 'dist', 'index.html'));
+});
 
 // API Routes
 app.use('/api/auth', require('./auth.cjs'));
@@ -119,6 +129,52 @@ app.use('/api/triage', require('./triage.cjs'));
 app.use('/api/beds', require('./beds.cjs'));
 app.use('/api/ems', require('./ems.cjs')); // New EMS routes
 app.use('/api/ems/patient', require('./ems_patient.cjs')); // New Patient-facing EMS routes
+
+// === Phase 3: Blockchain & Analytics ===
+const { medicareChain, Block } = require('./blockchainService.cjs');
+const { predictWaitTime } = require('./analyticsService.cjs');
+
+// Blockchain API
+app.get('/api/blockchain/history/:patientId', (req, res) => {
+  const { patientId } = req.params;
+  // Filter chain for blocks relevant to this patient (in a real chain, you'd index this)
+  const patientHistory = medicareChain.chain.filter(block =>
+    block.data && block.data.patientId === patientId
+  );
+  res.json({ success: true, chain: patientHistory });
+});
+
+app.post('/api/blockchain/log', (req, res) => {
+  const { patientId, doctorId, action } = req.body;
+  if (!patientId || !doctorId) return res.status(400).json({ error: "Missing data" });
+
+  const newBlock = new Block(
+    Date.now(),
+    new Date().toISOString(),
+    { patientId, doctorId, action: action || "ACCESS_RECORD" }
+  );
+  medicareChain.addBlock(newBlock);
+  res.json({ success: true, message: "Transaction logged to blockchain" });
+});
+
+// Predictive Analytics API
+app.get('/api/analytics/predict-wait-time', (req, res) => {
+  const waitTime = predictWaitTime();
+  res.json({ success: true, waitTimeMinutes: waitTime });
+});
+
+const { translateText } = require('./translationService.cjs');
+
+// Translation API
+app.post('/api/translate', async (req, res) => {
+  const { text, targetLanguage } = req.body;
+  if (!text || !targetLanguage) {
+    return res.status(400).json({ success: false, message: 'Text and targetLanguage required' });
+  }
+  const translatedText = await translateText(text, targetLanguage);
+  res.json({ success: true, translation: translatedText });
+});
+
 console.log("✅ '/api/beds' route registered successfully.");
 
 // --- CHANGE 2: Listen on '0.0.0.0' for Render ---

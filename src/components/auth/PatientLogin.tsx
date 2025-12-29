@@ -1,9 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { ArrowLeft, HeartPulse } from 'lucide-react';
-import { motion } from 'framer-motion';
-
-
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Mail, Lock } from 'lucide-react';
+import { AnimatedLogin } from './AnimatedLogin';
 import apiUrl from '@/config/api';
 
 export default function PatientLogin({ onLogin, setAuthMode }) {
@@ -18,8 +16,7 @@ export default function PatientLogin({ onLogin, setAuthMode }) {
     setError('');
     setIsLoading(true);
     try {
-      // Simulate network delay for UI feedback
-      await new Promise(resolve => setTimeout(resolve, 500)); 
+      await new Promise(resolve => setTimeout(resolve, 800)); // Slight delay for animation feel
       const response = await fetch(apiUrl('/api/auth/patient/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -29,130 +26,83 @@ export default function PatientLogin({ onLogin, setAuthMode }) {
       if (data.success) {
         onLogin(data.patient);
       } else {
-        setError(data.message || 'Invalid credentials. Please try again.');
+        setError(data.message || 'Invalid credentials.');
       }
     } catch (error) {
       console.error('Patient login error', error);
-      setError('Failed to connect to the server.');
+      setError('Connection failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
-  
-  const containerVariants = {
-    hidden: { opacity: 0, scale: 0.95 },
-    visible: {
-      opacity: 1,
-      scale: 1,
-      transition: {
-        staggerChildren: 0.1,
-        duration: 0.4,
-        ease: "easeOut"
-      },
-    },
-  };
-
-  const itemVariants = {
-    hidden: { y: 20, opacity: 0 },
-    visible: {
-      y: 0,
-      opacity: 1,
-      transition: { type: 'spring', stiffness: 100 },
-    },
-  };
 
   return (
-    <div className="relative flex items-center justify-center min-h-screen bg-cover bg-center text-white font-sans overflow-hidden" style={{ backgroundImage: "url('/login-bg.jpg')" }}>
-      {/* Darkening Overlay */}
-      <div className="absolute inset-0 bg-black/60 z-0"></div>
-
-
-
-
-      <div className="absolute top-4 left-4 z-20">
-        <button
-          onClick={() => navigate('/')}
-          className="inline-flex items-center justify-center p-2 rounded-full text-white bg-white/10 hover:bg-white/20 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
-          aria-label="Back to Portal Selection"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-      </div>
-
-      {/* Login Card */}
-      <motion.div
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-        className="relative z-10 w-full max-w-md mx-4 sm:mx-0 p-6 sm:p-8 space-y-6 bg-black/20 backdrop-blur-lg rounded-2xl border border-white/10 shadow-2xl"
-      >
-        <motion.div variants={itemVariants} className="text-center">
-          <div className="inline-block bg-gray-800/50 p-3 rounded-full mb-4 border border-white/10">
-            <HeartPulse className="w-8 h-8 text-blue-400" />
-          </div>
-          <h2 className="text-3xl font-bold text-white">Patient Portal</h2>
-          <p className="text-gray-300 mt-2 text-base">Sign in to access your health dashboard.</p>
-        </motion.div>
-        
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <motion.div variants={itemVariants}>
-            <label className="block text-sm font-medium text-gray-400 mb-2">Email</label>
+    <AnimatedLogin
+      title="Patient Portal"
+      description="Access your medical records and appointments safely."
+      onSubmit={handleSubmit}
+      isLoading={isLoading}
+    >
+      <div className="space-y-4">
+        {/* Email Input */}
+        <div className="group relative">
+          <label className="block text-xs font-medium text-cyan-100/60 mb-1 ml-1 uppercase tracking-wider">Email Address</label>
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Mail className="h-5 w-5 text-cyan-400/50 group-focus-within:text-cyan-400 transition-colors" />
+            </div>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 bg-white/5 text-white border border-white/10 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all placeholder:text-gray-500"
+              className="block w-full pl-10 pr-3 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent transition-all backdrop-blur-sm"
+              placeholder="you@example.com"
               required
             />
-          </motion.div>
-          <motion.div variants={itemVariants}>
-            <label className="block text-sm font-medium text-gray-400 mb-2">Password</label>
+          </div>
+        </div>
+
+        {/* Password Input */}
+        <div className="group relative">
+          <label className="block text-xs font-medium text-cyan-100/60 mb-1 ml-1 uppercase tracking-wider">Password</label>
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Lock className="h-5 w-5 text-cyan-400/50 group-focus-within:text-cyan-400 transition-colors" />
+            </div>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 bg-white/5 text-white border border-white/10 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all placeholder:text-gray-500"
+              className="block w-full pl-10 pr-3 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent transition-all backdrop-blur-sm"
+              placeholder="••••••••"
               required
             />
-          </motion.div>
+          </div>
+        </div>
 
-          {error && (
-              <motion.p 
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="text-sm text-red-400 text-center"
-              >
-                {error}
-              </motion.p>
-          )}
+        {error && (
+          <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-200 text-sm text-center">
+            {error}
+          </div>
+        )}
 
-          <motion.div variants={itemVariants}>
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full px-4 py-3 font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-black focus:ring-blue-500 disabled:bg-gray-600 disabled:cursor-not-allowed"
-            >
-              {isLoading ? 'Signing In...' : 'Sign In'}
-            </button>
-          </motion.div>
-
-          <motion.div variants={itemVariants} className="text-center">
-            <p className="text-base text-gray-400">
-              <button type="button" onClick={() => setAuthMode('forgot_password')} className="font-medium text-blue-400 hover:underline">
-                Forgot Password?
-              </button>
-            </p>
-          </motion.div>
-          <motion.div variants={itemVariants} className="text-center">
-            <p className="text-base text-gray-400">
-              Don't have an account?{' '}
-              <button type="button" onClick={() => setAuthMode('register')} className="font-medium text-blue-400 hover:underline">
-                Sign Up
-              </button>
-            </p>
-          </motion.div>
-        </form>
-      </motion.div>
-    </div>
+        <div className="flex items-center justify-between pt-2">
+          <button
+            type="button"
+            onClick={() => setAuthMode('forgot_password')}
+            className="text-sm text-cyan-300 hover:text-cyan-200 transition-colors font-medium"
+          >
+            Forgot Password?
+          </button>
+          <button
+            type="button"
+            onClick={() => setAuthMode('register')}
+            className="text-sm text-cyan-300 hover:text-cyan-200 transition-colors font-medium"
+          >
+            Create Account
+          </button>
+        </div>
+      </div>
+    </AnimatedLogin>
   );
 }

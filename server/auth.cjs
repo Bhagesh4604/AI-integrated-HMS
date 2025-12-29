@@ -12,11 +12,14 @@ router.post('/staff/login', (req, res) => {
   }
 
   const sql = 'SELECT * FROM employees WHERE email = ?';
-  
+
   executeQuery(sql, [email], (err, results) => {
     if (err) {
-      console.error("Database error during login:", err);
-      return res.status(500).json({ success: false, message: 'Internal server error' });
+      console.error("LOGIN ERROR: Database query failed.");
+      console.error("SQL Code:", err.code);
+      console.error("SQL Message:", err.sqlMessage);
+      console.error("Full Error:", err);
+      return res.status(500).json({ success: false, message: 'Internal server error: ' + err.message });
     }
 
     if (results.length === 0) {
@@ -30,8 +33,8 @@ router.post('/staff/login', (req, res) => {
     }
 
     if (!user.password) {
-        console.error(`Login attempt for user ${email} failed: No password is set in the database.`);
-        return res.status(401).json({ success: false, message: 'Invalid credentials. Account not fully configured.' });
+      console.error(`Login attempt for user ${email} failed: No password is set in the database.`);
+      return res.status(401).json({ success: false, message: 'Invalid credentials. Account not fully configured.' });
     }
 
     bcrypt.compare(password, user.password, (bcryptErr, isMatch) => {
@@ -41,8 +44,8 @@ router.post('/staff/login', (req, res) => {
       }
 
       if (isMatch) {
-        delete user.password; 
-        
+        delete user.password;
+
         // If the user is a paramedic, fetch their assigned ambulance_id
         if (user.role === 'ROLE_PARAMEDIC') {
           const ambulanceSql = 'SELECT ambulance_id FROM ambulancecrews WHERE user_id = ?';

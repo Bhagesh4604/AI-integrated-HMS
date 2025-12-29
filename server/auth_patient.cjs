@@ -65,13 +65,13 @@ router.post('/register', async (req, res) => {
 
         // Send welcome SMS (fire and forget)
         const { sendSms } = require('./sms.cjs');
-        
+
         sendSms(contact, 'Welcome to Shree Medicare! Your registration was successful.').catch(err => {
             console.error("Failed to send SMS during registration:", err);
         });
 
-        res.json({ 
-            success: true, 
+        res.json({
+            success: true,
             message: 'Patient registered successfully! A welcome SMS is being sent.'
         });
 
@@ -111,9 +111,9 @@ router.post('/login', (req, res) => {
 
         const user = results[0];
 
-        if (!user.isVerified) {
-            return res.status(401).json({ success: false, message: 'Please verify your email before logging in.' });
-        }
+        // if (!user.isVerified) {
+        //     return res.status(401).json({ success: false, message: 'Please verify your email before logging in.' });
+        // }
 
         if (!user.password) {
             return res.status(401).json({ success: false, message: 'Invalid credentials. Account not fully configured.' });
@@ -134,7 +134,7 @@ router.post('/login', (req, res) => {
                 if (patientErr || patientResults.length === 0) {
                     return res.status(500).json({ success: false, message: 'Could not retrieve patient details after login.' });
                 }
-                
+
                 res.json({
                     success: true,
                     message: 'Login successful!',

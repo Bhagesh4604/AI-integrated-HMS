@@ -193,7 +193,131 @@ router.put('/ambulances/:id/status', (req, res) => {
   });
 });
 
-// Get Active Trips
+// Helper to calculate distance (Haversine formula) in km
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371; // Radius of the earth in km
+  const dLat = deg2rad(lat2 - lat1);
+  const dLon = deg2rad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c; // Distance in km
+}
+
+function deg2rad(deg) {
+  return deg * (Math.PI / 180);
+}
+
+// AI Auto-Assign Ambulance (New Endpoint)
+router.post('/patient/book-ambulance', async (req, res) => {
+  const { patientId, lat, lng } = req.body;
+
+  if (!patientId || !lat || !lng) {
+    return res.status(400).json({ success: false, message: 'Missing location or patient ID' });
+  }
+
+  try {
+    // 1. Get all available ambulances
+    const ambulances = await new Promise((resolve, reject) => {
+      const sql = `
+                SELECT a.ambulance_id, a.vehicle_name, 
+                       alh.latitude, alh.longitude
+                FROM ambulances a
+                LEFT JOIN (
+                    SELECT ambulance_id, latitude, longitude
+                    FROM ambulancelocationhistory
+                    WHERE (ambulance_id, timestamp) IN (
+                        SELECT ambulance_id, MAX(timestamp)
+                        FROM ambulancelocationhistory
+                        GROUP BY ambulance_id
+                    )
+                ) alh ON a.ambulance_id = alh.ambulance_id
+                WHERE a.current_status = 'Available'
+            `;
+      executeQuery(sql, [], (err, results) => {
+        if (err) reject(err);
+        resolve(results);
+      });
+    });
+
+    if (ambulances.length === 0) {
+      return res.status(404).json({ success: false, message: 'No available ambulances found nearby.' });
+    }
+
+    // 2. AI Logic: Find nearest + Traffic Simulation
+    let bestAmbulance = null;
+    let minTime = Infinity;
+
+    for (const amb of ambulances) {
+      // Default location if no history (e.g. at hospital base)
+      const ambLat = amb.latitude || 12.9716;
+      const ambLng = amb.longitude || 77.5946;
+
+      const distance = calculateDistance(lat, lng, ambLat, ambLng);
+
+      // Simulating Traffic Condition (Random factor between 1.0 and 2.0)
+      const trafficFactor = 1.0 + Math.random();
+      const speed = 40; // Average speed 40 km/h
+
+      const estimatedTime = (distance / speed) * 60 * trafficFactor; // Minutes
+
+      if (estimatedTime < minTime) {
+        minTime = estimatedTime;
+        bestAmbulance = amb;
+      }
+    }
+
+    // 3. Create Trip automatically
+    const trip_id = `ER-${Date.now()}-${Math.floor(Math.random() * 9000)}`;
+    const alert_timestamp = new Date();
+    const eta = Math.round(minTime);
+
+    // Transaction to book
+    await new Promise((resolve, reject) => {
+      // A. Create Trip
+      const createTripSql = `
+                INSERT INTO emergencytrips 
+                (trip_id, status, alert_source, scene_location_lat, scene_location_lon, booked_by_patient_id, alert_timestamp, assigned_ambulance_id, eta_minutes)
+                VALUES (?, 'Assigned', 'Patient_App', ?, ?, ?, ?, ?, ?)
+             `;
+      executeQuery(createTripSql, [trip_id, lat, lng, patientId, alert_timestamp, bestAmbulance.ambulance_id, eta], (err) => {
+        if (err) return reject(err);
+
+        // B. Update Ambulance Status
+        const updateAmbSql = `UPDATE ambulances SET current_status = 'On_Trip', current_trip_id = ? WHERE ambulance_id = ?`;
+        executeQuery(updateAmbSql, [trip_id, bestAmbulance.ambulance_id], (err2) => {
+          if (err2) return reject(err2);
+          resolve();
+        });
+      });
+    });
+
+    // 4. Broadcast Update
+    broadcast(req.wss, {
+      type: 'TRIP_ASSIGNED',
+      payload: {
+        trip: { trip_id, eta_minutes: eta, status: 'Assigned' },
+        ambulance: bestAmbulance
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'Ambulance dispatched!',
+      tripId: trip_id,
+      vehicle: bestAmbulance.vehicle_name,
+      eta: eta
+    });
+
+  } catch (error) {
+    console.error("Auto-dispatch error:", error);
+    res.status(500).json({ success: false, message: 'Auto-dispatch failed' });
+  }
+});
+
+// Get Active Trips (Existing)
 router.get('/trips/active', (req, res) => {
   const sql = `
     SELECT 
@@ -379,13 +503,13 @@ router.post('/alerts/manual', async (req, res) => {
   };
 
   const sql = `INSERT INTO emergencytrips (trip_id, status, alert_source, scene_location_lat, scene_location_lon, patient_name, notes, patient_id, alert_timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-  
+
   executeQuery(sql, [trip_id, 'New_Alert', 'Manual_Entry', scene_location_lat, scene_location_lon, patient_name, notes, patient_id, alert_timestamp], (err, results) => {
     if (err) {
       console.error("Database error creating manual alert:", err);
       return res.status(500).json({ success: false, message: 'Failed to create manual alert.' });
     }
-    
+
     // Broadcast WebSocket message
     broadcast(req.wss, { type: 'NEW_ALERT', payload: newAlert });
 
@@ -447,13 +571,13 @@ router.post('/vitals', (req, res) => {
   const timestamp = new Date();
   const newVitals = { trip_id, timestamp, heart_rate, blood_pressure_systolic, blood_pressure_diastolic, notes };
   const sql = `INSERT INTO tripvitals (trip_id, timestamp, heart_rate, blood_pressure_systolic, blood_pressure_diastolic, notes) VALUES (?, ?, ?, ?, ?, ?)`;
-  
+
   executeQuery(sql, [trip_id, timestamp, heart_rate, blood_pressure_systolic, blood_pressure_diastolic, notes], (err, results) => {
     if (err) {
       console.error("Database error submitting vitals:", err);
       return res.status(500).json({ success: false, message: 'Failed to submit vitals.' });
     }
-    
+
     // Broadcast WebSocket message
     const payload = { ...newVitals, vitals_id: results.insertId };
     // console.log('[WebSocket Broadcast] Broadcasting NEW_VITALS:', payload);
@@ -784,7 +908,7 @@ router.get('/trips/history', (req, res) => {
     ORDER BY et.updated_at DESC
     LIMIT 100; -- Add a limit to prevent fetching too much data at once
   `;
-  
+
   executeQuery(sql, [], (err, results) => {
     if (err) {
       console.error("Database error fetching trip history:", err);

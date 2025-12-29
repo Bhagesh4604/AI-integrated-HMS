@@ -32,6 +32,8 @@ import FleetManagementDashboard from './pages/FleetManagementDashboard'; // New 
 import ParamedicMode from './pages/ParamedicMode'; // New Paramedic Mode
 import ERDashboard from './pages/ERDashboard'; // New ER Dashboard
 import EmsLayout from './components/ems/EmsLayout'; // New EMS Layout
+import DoctorCardiacMonitor from './pages/DoctorCardiacMonitor'; // New Cardiac Monitor
+import OncologyScreening from './components/OncologyScreening'; // New Oncology Module
 
 // --- AUTH & ROUTING IMPORTS ---
 import StaffLogin from './components/auth/StaffLogin';
@@ -71,6 +73,8 @@ const MainApplication = ({ user, onLogout, updateUser }) => {
       case 'surgical': return <SurgicalModule />;
       case 'telemedicine': return isDoctor ? <TelemedicineModule user={user} /> : <div className="p-8 text-red-500">Access Denied</div>;
       case 'appointments': return <AppointmentsView user={user} />;
+      case 'cardiac-monitor': return <DoctorCardiacMonitor />; // New Module
+      case 'oncology-screening': return <OncologyScreening />; // New Module
       case 'my-schedule': return isDoctor ? <DoctorScheduleModule user={user} /> : <div className="p-8 text-red-500">Access Denied</div>;
       case 'analytics': return isAdmin ? <AnalyticsDashboard /> : <div className="p-8 text-red-500">Access Denied</div>;
       case 'bed-management': return isAdmin ? <BedManagement /> : <div className="p-8 text-red-500">Access Denied</div>;
@@ -181,67 +185,67 @@ function App() {
       <Route path="/reset-password" element={<ResetPassword />} />
 
       {/* Protected Routes */}
-      <Route 
-        path="/staff-dashboard" 
+      <Route
+        path="/staff-dashboard"
         element={
           <ProtectedRoute user={loggedInUser} allowedRoles={['admin', 'doctor']}>
             <MainApplication user={loggedInUser} onLogout={handleLogout} updateUser={updateLoggedInUser} />
           </ProtectedRoute>
-        } 
+        }
       />
-      <Route 
-        path="/patient-dashboard" 
+      <Route
+        path="/patient-dashboard"
         element={
           <ProtectedRoute user={loggedInUser} allowedRoles={['patient']}>
             <PatientDashboard patient={loggedInUser} onLogout={handleLogout} updateUser={updateLoggedInUser} />
           </ProtectedRoute>
-        } 
+        }
       />
-      <Route 
-        path="/patient/book-ambulance" 
+      <Route
+        path="/patient/book-ambulance"
         element={
           <ProtectedRoute user={loggedInUser} allowedRoles={['patient']}>
             <BookAmbulance user={loggedInUser} />
           </ProtectedRoute>
-        } 
+        }
       />
-      <Route 
-        path="/patient/track-ambulance/:tripId" 
+      <Route
+        path="/patient/track-ambulance/:tripId"
         element={
           <ProtectedRoute user={loggedInUser} allowedRoles={['patient']}>
             <TrackAmbulance user={loggedInUser} />
           </ProtectedRoute>
-        } 
+        }
       />
-      <Route 
-        path="/fleet-management" 
+      <Route
+        path="/fleet-management"
         element={
           <ProtectedRoute user={loggedInUser} allowedRoles={['ROLE_DISPATCHER', 'admin']}>
             <EmsLayout user={loggedInUser} onLogout={handleLogout}>
               <FleetManagementDashboard />
             </EmsLayout>
           </ProtectedRoute>
-        } 
+        }
       />
-      <Route 
-        path="/paramedic-mode" 
+      <Route
+        path="/paramedic-mode"
         element={
           <ProtectedRoute user={loggedInUser} allowedRoles={['ROLE_PARAMEDIC']}>
             <EmsLayout user={loggedInUser} onLogout={handleLogout}>
               <ParamedicMode user={loggedInUser} />
             </EmsLayout>
           </ProtectedRoute>
-        } 
+        }
       />
-      <Route 
-        path="/er-dashboard" 
+      <Route
+        path="/er-dashboard"
         element={
           <ProtectedRoute user={loggedInUser} allowedRoles={['ROLE_ER_STAFF', 'admin']}>
             <EmsLayout user={loggedInUser} onLogout={handleLogout}>
               <ERDashboard />
             </EmsLayout>
           </ProtectedRoute>
-        } 
+        }
       />
     </Routes>
   );

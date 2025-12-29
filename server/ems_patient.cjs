@@ -117,16 +117,16 @@ async function autoDispatchTrip(trip_id, scene_location, wss) {
     // 6. Insert initial location into history
     const insertLocationSql = `INSERT INTO ambulancelocationhistory (ambulance_id, latitude, longitude, timestamp) VALUES (?, ?, ?, ?)`;
     await new Promise((resolve, reject) => {
-        executeQuery(insertLocationSql, [closestAmbulance.ambulance_id, closestAmbulance.last_latitude, closestAmbulance.last_longitude, new Date()], (err, result) => {
-            if (err) return reject(err);
-            resolve(result);
-        });
+      executeQuery(insertLocationSql, [closestAmbulance.ambulance_id, closestAmbulance.last_latitude, closestAmbulance.last_longitude, new Date()], (err, result) => {
+        if (err) return reject(err);
+        resolve(result);
+      });
     });
 
     // 7. Broadcast WebSocket updates
     const tripUpdate = { trip_id, status: 'Assigned', assigned_ambulance_id: closestAmbulance.ambulance_id };
     const ambulanceUpdate = { ambulance_id: closestAmbulance.ambulance_id, status: 'On_Trip' };
-    
+
     broadcast(wss, { type: 'TRIP_ASSIGNED', payload: { trip: tripUpdate, ambulance: ambulanceUpdate } });
     broadcast(wss, { type: 'FLEET_STATUS_UPDATE', payload: [ambulanceUpdate] });
 
@@ -175,14 +175,14 @@ router.post('/book-ambulance', async (req, res) => {
     };
 
     const sql = `INSERT INTO emergencytrips (trip_id, status, alert_source, scene_location_lat, scene_location_lon, patient_name, notes, patient_id, booked_by_patient_id, alert_timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-    
+
     await new Promise((resolve, reject) => {
       executeQuery(sql, [trip_id, 'New_Alert', 'Patient_App', latitude, longitude, newTrip.patient_name, notes, patient_id, patient_id, alert_timestamp], (err, results) => {
         if (err) return reject(err);
         resolve(results);
       });
     });
-    
+
     // Broadcast WebSocket message for the new alert
     broadcast(req.wss, { type: 'NEW_ALERT', payload: newTrip });
 
@@ -198,18 +198,19 @@ router.post('/book-ambulance', async (req, res) => {
 });
 
 router.get('/my-trip-status', async (req, res) => {
-    const { patientId } = req.query;
-    if (!patientId) {
-        return res.status(400).json({ success: false, message: 'Patient ID is required.' });
-    }
+  const { patientId } = req.query;
+  if (!patientId) {
+    return res.status(400).json({ success: false, message: 'Patient ID is required.' });
+  }
 
-    try {
-        const sql = `
+  try {
+    const sql = `
             SELECT 
                 et.trip_id,
                 et.status,
                 et.assignment_timestamp,
                 et.completion_timestamp,
+                et.eta_minutes,
                 a.vehicle_name,
                 u.firstName as paramedic_firstName,
                 u.lastName as paramedic_lastName,
@@ -234,65 +235,65 @@ router.get('/my-trip-status', async (req, res) => {
             LIMIT 1;
         `;
 
-        const trip = await new Promise((resolve, reject) => {
-            executeQuery(sql, [patientId], (err, result) => {
-                if (err) return reject(err);
-                resolve(result[0] || null);
-            });
-        });
+    const trip = await new Promise((resolve, reject) => {
+      executeQuery(sql, [patientId], (err, result) => {
+        if (err) return reject(err);
+        resolve(result[0] || null);
+      });
+    });
 
-        res.json({ success: true, trip: trip });
+    res.json({ success: true, trip: trip });
 
-    } catch (error) {
-        console.error("Database error fetching patient's trip status:", error);
-        res.status(500).json({ success: false, message: 'Failed to fetch trip status.' });
-    }
+  } catch (error) {
+    console.error("Database error fetching patient's trip status:", error);
+    res.status(500).json({ success: false, message: 'Failed to fetch trip status.' });
+  }
 });
 
 router.post('/cancel-trip', async (req, res) => {
-    const { trip_id } = req.body;
-    if (!trip_id) {
-        return res.status(400).json({ success: false, message: 'Trip ID is required.' });
+  const { trip_id } = req.body;
+  if (!trip_id) {
+    return res.status(400).json({ success: false, message: 'Trip ID is required.' });
+  }
+
+  try {
+    // Get the assigned ambulance_id before updating the trip
+    const getTripSql = `SELECT assigned_ambulance_id FROM emergencytrips WHERE trip_id = ?`;
+    const trip = await new Promise((resolve, reject) => {
+      executeQuery(getTripSql, [trip_id], (err, result) => {
+        if (err) return reject(err);
+        if (result.length === 0) return reject(new Error('Trip not found.'));
+        resolve(result[0]);
+      });
+    });
+    const { assigned_ambulance_id } = trip;
+
+    // Update trip status to 'Cancelled'
+    const updateTripSql = `UPDATE emergencytrips SET status = 'Cancelled' WHERE trip_id = ?`;
+    await new Promise((resolve, reject) => {
+      executeQuery(updateTripSql, [trip_id], (err, result) => {
+        if (err) return reject(err);
+        resolve(result);
+      });
+    });
+
+    // If an ambulance was assigned, update its status to 'Available'
+    if (assigned_ambulance_id) {
+      const updateAmbulanceSql = `UPDATE ambulances SET current_status = 'Available', current_trip_id = NULL WHERE ambulance_id = ?`;
+      await new Promise((resolve, reject) => {
+        executeQuery(updateAmbulanceSql, [assigned_ambulance_id], (err, result) => {
+          if (err) return reject(err);
+          resolve(result);
+        });
+      });
     }
 
-    try {
-        // Get the assigned ambulance_id before updating the trip
-        const getTripSql = `SELECT assigned_ambulance_id FROM emergencytrips WHERE trip_id = ?`;
-        const trip = await new Promise((resolve, reject) => {
-            executeQuery(getTripSql, [trip_id], (err, result) => {
-                if (err) return reject(err);
-                if (result.length === 0) return reject(new Error('Trip not found.'));
-                resolve(result[0]);
-            });
-        });
-        const { assigned_ambulance_id } = trip;
+    res.json({ success: true, message: 'Trip cancelled successfully.' });
 
-        // Update trip status to 'Cancelled'
-        const updateTripSql = `UPDATE emergencytrips SET status = 'Cancelled' WHERE trip_id = ?`;
-        await new Promise((resolve, reject) => {
-            executeQuery(updateTripSql, [trip_id], (err, result) => {
-                if (err) return reject(err);
-                resolve(result);
-            });
-        });
-
-        // If an ambulance was assigned, update its status to 'Available'
-        if (assigned_ambulance_id) {
-            const updateAmbulanceSql = `UPDATE ambulances SET current_status = 'Available', current_trip_id = NULL WHERE ambulance_id = ?`;
-            await new Promise((resolve, reject) => {
-                executeQuery(updateAmbulanceSql, [assigned_ambulance_id], (err, result) => {
-                    if (err) return reject(err);
-                    resolve(result);
-                });
-            });
-        }
-
-        res.json({ success: true, message: 'Trip cancelled successfully.' });
-
-    } catch (error) {
-        console.error("Database error cancelling trip:", error);
-        res.status(500).json({ success: false, message: 'Failed to cancel trip.' });
-    }
+  } catch (error) {
+    console.error("Database error cancelling trip:", error);
+    res.status(500).json({ success: false, message: 'Failed to cancel trip.' });
+  }
 });
 
 

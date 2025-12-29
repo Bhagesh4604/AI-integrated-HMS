@@ -16,32 +16,39 @@ const MedicationCard = ({ item, onTrack }) => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.8 }}
-            className={`p-4 rounded-2xl border ${isTaken ? 'bg-green-500/10 border-green-500/20' : isSkipped ? 'bg-red-500/10 border-red-500/20' : 'bg-card border-border'}`}
+            className={`p-6 rounded-2xl border backdrop-blur-xl shadow-lg transition-all 
+                ${isTaken
+                    ? 'bg-green-500/20 border-green-500/30 shadow-green-500/10'
+                    : isSkipped
+                        ? 'bg-red-500/20 border-red-500/30'
+                        : 'bg-white/70 dark:bg-black/40 border-white/20 dark:border-white/5'
+                }`}
         >
             <div className="flex items-start justify-between">
                 <div>
-                    <p className="font-bold text-lg text-foreground">{item.medication}</p>
-                    <p className="text-sm text-muted-foreground">{item.dosage}</p>
+                    <p className="font-bold text-xl text-gray-900 dark:text-white">{item.medication}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 font-medium">{item.dosage}</p>
                 </div>
-                <div className={`flex items-center gap-1.5 text-sm font-medium ${isTaken ? 'text-green-400' : isSkipped ? 'text-red-400' : 'text-muted-foreground'}`}>
-                    {isTaken ? <Check size={16} /> : isSkipped ? <X size={16} /> : <Clock size={16} />}
+                <div className={`flex items-center gap-1.5 text-sm font-bold px-3 py-1 rounded-full 
+                    ${isTaken ? 'bg-green-500/20 text-green-500' : isSkipped ? 'bg-red-500/20 text-red-500' : 'bg-gray-100 dark:bg-white/10 text-gray-500'}`}>
+                    {isTaken ? <Check size={14} /> : isSkipped ? <X size={14} /> : <Clock size={14} />}
                     {time}
                 </div>
             </div>
-            
+
             {isActionable && (
-                <div className="grid grid-cols-2 gap-3 mt-4">
-                    <button 
-                        onClick={() => onTrack(item, 'skipped')} 
-                        className="w-full py-2.5 bg-muted hover:bg-muted/80 rounded-lg text-sm font-semibold flex items-center justify-center gap-2"
+                <div className="grid grid-cols-2 gap-3 mt-6">
+                    <button
+                        onClick={() => onTrack(item, 'skipped')}
+                        className="w-full py-3 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30 text-red-600 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors"
                     >
-                        <X size={16} /> Skip
+                        <X size={18} /> Skip
                     </button>
-                    <button 
-                        onClick={() => onTrack(item, 'taken')} 
-                        className="w-full py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-sm font-semibold flex items-center justify-center gap-2"
+                    <button
+                        onClick={() => onTrack(item, 'taken')}
+                        className="w-full py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg shadow-green-500/30 hover:shadow-green-500/40 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all"
                     >
-                        <Check size={16} /> Take
+                        <Check size={18} /> Take
                     </button>
                 </div>
             )}
@@ -80,10 +87,10 @@ export default function MedicationTracker({ patient }) {
     const handleTrack = async (item, status) => {
         // Optimistic UI update
         const originalMeds = [...medications];
-        const updatedMeds = medications.map(med => 
-            med.prescriptionId === item.prescriptionId && med.time === item.time 
-            ? { ...med, status } 
-            : med
+        const updatedMeds = medications.map(med =>
+            med.prescriptionId === item.prescriptionId && med.time === item.time
+                ? { ...med, status }
+                : med
         );
         setMedications(updatedMeds);
 
@@ -145,7 +152,7 @@ export default function MedicationTracker({ patient }) {
         <div className="p-4 sm:p-8">
             <h1 className="text-3xl font-bold mb-2 text-foreground">Medications</h1>
             <p className="text-muted-foreground mb-8">Log the medications you've taken today, {new Date().toLocaleDateString('en-US', { weekday: 'long' })}.</p>
-            
+
             <div className="space-y-8">
                 {medications.length > 0 ? (
                     <>

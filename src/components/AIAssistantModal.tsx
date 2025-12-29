@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Send, Sparkles, FileText, ListChecks } from 'lucide-react';
+import { X, Send, Sparkles, FileText, ListChecks, Mic } from 'lucide-react';
+import useSpeechRecognition from '../hooks/useSpeechRecognition';
+import MedicalDisclaimerBanner from './MedicalDisclaimerBanner';
 
 // In a real app, these would be in separate files
 import apiUrl from '@/config/api';
@@ -12,6 +14,11 @@ export default function AIAssistantModal({ onClose, records = [], labResults = [
     const [loading, setLoading] = useState(false);
     const chatEndRef = useRef(null);
 
+    const { isListening, startListening, stopListening } = useSpeechRecognition({
+        commandMode: false,
+        onResult: (text) => setInput(prev => prev + ' ' + text)
+    });
+
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages, loading]);
@@ -19,11 +26,11 @@ export default function AIAssistantModal({ onClose, records = [], labResults = [
     const summary = useMemo(() => {
         const lines = [];
         if (records.length) {
-            const recent = records.slice().sort((a,b) => new Date(b.recordDate || '').getTime() - new Date(a.recordDate || '').getTime())[0];
+            const recent = records.slice().sort((a, b) => new Date(b.recordDate || '').getTime() - new Date(a.recordDate || '').getTime())[0];
             if (recent) lines.push(`Recent diagnosis: ${recent.diagnosis || 'N/A'}`);
         }
         if (labResults.length) {
-            const recentLab = labResults.slice().sort((a,b) => new Date(b.testDate).getTime() - new Date(a.testDate).getTime())[0];
+            const recentLab = labResults.slice().sort((a, b) => new Date(b.testDate).getTime() - new Date(a.testDate).getTime())[0];
             if (recentLab) lines.push(`Latest lab result: ${recentLab.testName || 'Lab'} — status: ${recentLab.status || 'unknown'}`);
         }
         if (prescriptions.length) {
@@ -63,12 +70,12 @@ export default function AIAssistantModal({ onClose, records = [], labResults = [
             setLoading(false);
         }
     }
-    
+
     const TypingIndicator = () => (
         <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex justify-start"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex justify-start"
         >
             <div className="p-3 rounded-2xl bg-gray-700 flex items-center space-x-1.5">
                 <motion.div animate={{ y: [0, -4, 0] }} transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut" }} className="w-2 h-2 bg-gray-500 rounded-full" />
@@ -105,25 +112,26 @@ export default function AIAssistantModal({ onClose, records = [], labResults = [
                     {/* Left Panel: Summary */}
                     <div className="w-1/3 flex flex-col gap-6">
                         <div className="bg-gray-800/50 p-4 rounded-xl border border-gray-700">
-                             <h3 className="font-semibold text-white flex items-center gap-2 mb-2"><FileText size={16}/> Patient Summary</h3>
-                             <ul className="list-disc list-inside text-sm text-gray-300 space-y-1">
+                            <h3 className="font-semibold text-white flex items-center gap-2 mb-2"><FileText size={16} /> Patient Summary</h3>
+                            <ul className="list-disc list-inside text-sm text-gray-300 space-y-1">
                                 {summary.map((l, i) => <li key={i}>{l}</li>)}
                             </ul>
                         </div>
-                         <div className="bg-gray-800/50 p-4 rounded-xl border border-gray-700">
-                             <h3 className="font-semibold text-white flex items-center gap-2 mb-2"><ListChecks size={16}/> Quick Prompts</h3>
-                             <div className="flex flex-col gap-2">
+                        <div className="bg-gray-800/50 p-4 rounded-xl border border-gray-700">
+                            <h3 className="font-semibold text-white flex items-center gap-2 mb-2"><ListChecks size={16} /> Quick Prompts</h3>
+                            <div className="flex flex-col gap-2">
                                 <button onClick={() => setInput('Summarize patient history.')} className="text-sm text-left p-2 bg-gray-700/50 hover:bg-gray-700 rounded">Summarize history</button>
                                 <button onClick={() => setInput('What are the potential risks based on the summary?')} className="text-sm text-left p-2 bg-gray-700/50 hover:bg-gray-700 rounded">Identify risks</button>
                                 <button onClick={() => setInput('Draft a follow-up plan.')} className="text-sm text-left p-2 bg-gray-700/50 hover:bg-gray-700 rounded">Draft follow-up plan</button>
-                             </div>
+                            </div>
                         </div>
                     </div>
-                    
+
                     {/* Right Panel: Chat */}
                     <div className="w-2/3 flex flex-col bg-gray-900/50 rounded-xl border border-gray-700">
                         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                             <AnimatePresence>
+                            <MedicalDisclaimerBanner />
+                            <AnimatePresence>
                                 {messages.map((msg, index) => (
                                     <motion.div
                                         key={index}
@@ -138,12 +146,19 @@ export default function AIAssistantModal({ onClose, records = [], labResults = [
                                         />
                                     </motion.div>
                                 ))}
-                             </AnimatePresence>
-                             {loading && <TypingIndicator />}
-                             <div ref={chatEndRef} />
+                            </AnimatePresence>
+                            {loading && <TypingIndicator />}
+                            <div ref={chatEndRef} />
                         </div>
                         <form onSubmit={handleSend} className="p-4 border-t border-gray-700">
-                             <div className="flex gap-3 items-center bg-gray-800 border border-gray-600 rounded-full p-2">
+                            <div className="flex gap-3 items-center bg-gray-800 border border-gray-600 rounded-full p-2">
+                                <motion.button
+                                    type="button"
+                                    onClick={isListening ? stopListening : startListening}
+                                    className={`p-2 rounded-full transition-colors ${isListening ? 'bg-red-500 text-white animate-pulse' : 'text-gray-400 hover:text-white'}`}
+                                >
+                                    <Mic size={20} />
+                                </motion.button>
                                 <input
                                     type="text"
                                     value={input}

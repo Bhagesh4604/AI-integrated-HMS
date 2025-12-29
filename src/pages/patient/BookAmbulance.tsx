@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import useGeolocation from '../../hooks/useGeolocation';
 import apiUrl from '../../config/api';
 import { Button } from '@/components/ui/button';
@@ -218,34 +219,54 @@ const BookAmbulance = ({ user }) => {
 
   if (isLoading) {
     return (
-      <div className="p-8 text-center">
-        <Loader2 className="mx-auto h-8 w-8 animate-spin" />
-        <p className="mt-2">Checking for active trips...</p>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-black font-sans">
+        <Loader2 className="h-10 w-10 animate-spin text-blue-500 mb-4" />
+        <p className="text-gray-500 animate-pulse">Checking ambulance status...</p>
       </div>
     );
   }
 
   return (
-    <div className="p-4 bg-gray-100 dark:bg-gray-900 min-h-screen flex flex-col">
-      <div className="w-full rounded-lg overflow-hidden shadow-md mb-4 h-[33vh]">
-        <ParamedicMapView ambulances={availableAmbulances} />
+    <div className="relative min-h-screen flex flex-col items-center justify-center p-4 font-sans overflow-hidden">
+      {/* GLOBAL ANIMATED BACKGROUND */}
+      <div className="absolute inset-0 z-0 bg-gray-50 dark:bg-[#0a0a0a]">
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-gray-50 to-cyan-50 dark:from-blue-900/10 dark:via-black dark:to-cyan-900/10 opacity-70 animate-gradient-xy"></div>
+        <div className="absolute top-[-20%] right-[-10%] w-[600px] h-[600px] bg-blue-400/20 rounded-full blur-[120px] pointer-events-none"></div>
+        <div className="absolute bottom-[-20%] left-[-10%] w-[600px] h-[600px] bg-cyan-400/20 rounded-full blur-[120px] pointer-events-none"></div>
       </div>
-      <Card className="w-full max-w-full flex-shrink-0 flex-grow">
-        <CardHeader className="relative">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute top-4 left-4"
-            onClick={() => navigate('/patient-dashboard')}
-          >
-            <ArrowLeft className="h-6 w-6" />
-          </Button>
-          <CardTitle className="text-2xl font-bold text-center">Book an Ambulance</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {renderContent()}
-        </CardContent>
-      </Card>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative z-10 w-full max-w-4xl flex flex-col gap-6"
+      >
+        <div className="w-full h-[33vh] rounded-3xl overflow-hidden shadow-2xl border border-white/20">
+          <ParamedicMapView ambulances={availableAmbulances} />
+        </div>
+
+        <div className="relative overflow-hidden rounded-3xl bg-white/70 dark:bg-black/40 backdrop-blur-xl border border-white/20 dark:border-white/5 shadow-xl">
+          <div className="p-6 relative">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute top-6 left-6 z-20 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md"
+              onClick={() => navigate('/patient-dashboard')}
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div className="text-center mb-8">
+              <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-red-500 to-orange-500 inline-flex items-center gap-2">
+                Call an Ambulance
+              </h1>
+              <p className="text-gray-500 dark:text-gray-400 mt-2">Emergency Service • 24/7 Availability</p>
+            </div>
+
+            <div className="max-w-xl mx-auto">
+              {renderContent()}
+            </div>
+          </div>
+        </div>
+      </motion.div>
     </div>
   );
 };

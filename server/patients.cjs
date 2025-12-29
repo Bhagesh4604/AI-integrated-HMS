@@ -6,43 +6,44 @@ const path = require('path');
 const fs = require('fs');
 
 const uploadDir = path.join(__dirname, '..', 'public', 'uploads');
-if (!fs.existsSync(uploadDir)){
+if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, uploadDir);
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
+const { uploadToBlob } = require('./azureStorage.cjs');
 
+// Use memory storage to get buffer for Azure upload
+const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
-router.post('/:id/upload-photo', upload.single('profilePhoto'), (req, res) => {
+router.post('/:id/upload-photo', upload.single('profilePhoto'), async (req, res) => {
     const { id } = req.params;
     if (!req.file) {
         return res.status(400).json({ success: false, message: 'No file uploaded.' });
     }
-    const profileImageUrl = `/uploads/${req.file.filename}`;
-    const sql = 'UPDATE patients SET profileImageUrl = ? WHERE id = ?';
-    executeQuery(sql, [profileImageUrl, id], (err, result) => {
-        if (err) {
-            return res.status(500).json({ success: false, message: 'Failed to update profile picture.' });
-        }
-        res.json({ success: true, message: 'Profile picture updated!', profileImageUrl: profileImageUrl });
-    });
+
+    try {
+        const profileImageUrl = await uploadToBlob(req.file.buffer, req.file.originalname);
+        const sql = 'UPDATE patients SET profileImageUrl = ? WHERE id = ?';
+        executeQuery(sql, [profileImageUrl, id], (err, result) => {
+            if (err) {
+                return res.status(500).json({ success: false, message: 'Failed to update profile picture.' });
+            }
+            res.json({ success: true, message: 'Profile picture updated!', profileImageUrl: profileImageUrl });
+        });
+    } catch (error) {
+        console.error("Upload to Azure failed:", error);
+        // Fallback or error
+        return res.status(500).json({ success: false, message: 'Failed to upload image to storage.' });
+    }
 });
 
 router.get('/', (req, res) => {
-  const sql = 'SELECT * FROM patients ORDER BY id DESC';
-  executeQuery(sql, [], (err, results) => {
-    if (err) return res.status(500).json({ success: false, message: 'Internal server error' });
-    res.json(results);
-  });
+    const sql = 'SELECT * FROM patients ORDER BY id DESC';
+    executeQuery(sql, [], (err, results) => {
+        if (err) return res.status(500).json({ success: false, message: 'Internal server error' });
+        res.json(results);
+    });
 });
 
 router.get('/:id', (req, res) => {
@@ -58,15 +59,15 @@ router.get('/:id', (req, res) => {
 router.post('/add', (req, res) => {
     const { firstName, lastName, dateOfBirth, gender, bloodGroup, phone, email, address, emergencyContact, emergencyPhone } = req.body;
     const patientId = `PAT-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-  const sql = `INSERT INTO patients (patientId, firstName, lastName, dateOfBirth, gender, bloodGroup, phone, email, address, emergencyContact, emergencyPhone, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-  const params = [patientId, firstName, lastName, dateOfBirth || null, gender, bloodGroup, phone, email, address, emergencyContact, emergencyPhone, 'active'];
-  executeQuery(sql, params, (err, result) => {
-    if (err) {
-        console.error("Error adding patient:", err);
-        return res.status(500).json({ success: false, message: 'Failed to add patient' });
-    }
-    res.json({ success: true, message: 'Patient added successfully!' });
-  });
+    const sql = `INSERT INTO patients (patientId, firstName, lastName, dateOfBirth, gender, bloodGroup, phone, email, address, emergencyContact, emergencyPhone, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    const params = [patientId, firstName, lastName, dateOfBirth || null, gender, bloodGroup, phone, email, address, emergencyContact, emergencyPhone, 'active'];
+    executeQuery(sql, params, (err, result) => {
+        if (err) {
+            console.error("Error adding patient:", err);
+            return res.status(500).json({ success: false, message: 'Failed to add patient' });
+        }
+        res.json({ success: true, message: 'Patient added successfully!' });
+    });
 });
 
 // --- FIX: Updated this route to include the 'status' field ---
@@ -108,6 +109,8 @@ router.get('/:patientId/full-history', async (req, res) => {
     }
 
     try {
+        const { medicareChain, Block } = require('./blockchainService.cjs');
+
         // Fetch basic patient details using patientId (varchar)
         const patientDetails = await new Promise((resolve, reject) => {
             executeQuery('SELECT id, firstName, lastName, patientId, dateOfBirth, gender, bloodGroup, phone, email, address, emergencyContact, emergencyPhone, status, profileImageUrl FROM patients WHERE patientId = ?', [patientId], (err, results) => {
@@ -115,6 +118,18 @@ router.get('/:patientId/full-history', async (req, res) => {
                 resolve(results[0]);
             });
         });
+
+        // --- BLOCKCHAIN LOGGING ---
+        // In a real app, req.user.id would be the doctor's ID from auth middleware
+        const doctorId = "DR-SESSION-USER"; // Placeholder pending auth integration
+        const logBlock = new Block(Date.now(), new Date().toISOString(), {
+            patientId: patientId,
+            doctorId: doctorId,
+            action: "VIEW_FULL_HISTORY"
+        });
+        medicareChain.addBlock(logBlock);
+        console.log(`[Blockchain] Access logged for patient ${patientId} by ${doctorId}`);
+        // --------------------------
 
         if (!patientDetails) {
             return res.status(404).json({ success: false, message: 'Patient not found.' });

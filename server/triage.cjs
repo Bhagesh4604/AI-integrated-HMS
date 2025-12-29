@@ -1,51 +1,44 @@
 const express = require('express');
 const router = express.Router();
-const fetch = require('node-fetch');
+const { AzureOpenAI } = require("openai");
 
-// This function will make the call to the Gemini API
-async function runGemini(userQuery, systemPrompt) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    // Add a check to see if the API key is missing or is the placeholder from .env.example
-    if (!apiKey || apiKey === 'AIzaSyDaKO402U3hoLbUozwO1ghctfds3_u47NY') {
-        const errorMsg = 'Error: Gemini API Key is not configured or is using the placeholder value. Please add your valid Gemini API Key to the .env file in the project root.';
-        console.error(errorMsg);
-        return errorMsg;
+// Azure OpenAI Configuration
+function getOpenAIClient() {
+    const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
+    const apiKey = process.env.AZURE_OPENAI_API_KEY;
+    const deploymentId = "gpt-4o";
+
+    if (!endpoint || !apiKey) {
+        console.error("Azure OpenAI credentials missing");
+        return null;
     }
+    const apiVersion = "2024-05-01-preview";
+    return new AzureOpenAI({ endpoint, apiKey, apiVersion, deployment: deploymentId });
+}
 
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-
-    const payload = {
-        contents: [{ parts: [{ text: userQuery }] }],
-    };
-
-    if (systemPrompt) {
-        payload.systemInstruction = { parts: [{ text: systemPrompt }] };
+async function runAzureOpenAI(userQuery, systemPrompt) {
+    const client = getOpenAIClient();
+    if (!client) {
+        return "AI Service is temporarily unavailable. Please try again later or contact support.";
     }
 
     try {
-        const response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+        const messages = [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userQuery }
+        ];
+
+        const result = await client.chat.completions.create({
+            messages: messages,
+            model: "",
         });
 
-        if (!response.ok) {
-            const errorBody = await response.text();
-            console.error("Gemini API Error Response:", errorBody);
-            // Provide a more specific error message to the client
-            return `Error from AI service: ${response.status} ${response.statusText}. Check server logs for details.`;
-        }
-
-        const result = await response.json();
-        return result.candidates?.[0]?.content?.parts?.[0]?.text || "Sorry, I couldn't process that request.";
-
+        return result.choices[0].message.content;
     } catch (error) {
-        console.error("Gemini API call error:", error);
-        // Provide more context on the connection error
-        return `Error: Could not connect to the AI service. Details: ${error.message}. Please check the server's network connection and ensure the API key is valid.`;
+        console.error("Azure OpenAI API error:", error);
+        return `Error calling Azure OpenAI: ${error.message}`;
     }
 }
-
 
 router.post('/ask', async (req, res) => {
     const { symptoms } = req.body;
@@ -61,7 +54,7 @@ router.post('/ask', async (req, res) => {
     4.  CRITICALLY IMPORTANT: You must end your response with the exact disclaimer: "Please note: This is an AI suggestion and not a medical diagnosis. For any medical emergencies, please visit the ER or contact a medical professional immediately."
     5.  Do not provide any medical advice, diagnosis, or treatment suggestions. Your only job is to suggest a department.`;
 
-    const reply = await runGemini(symptoms, systemPrompt);
+    const reply = await runAzureOpenAI(symptoms, systemPrompt);
 
     res.json({ reply });
 });
