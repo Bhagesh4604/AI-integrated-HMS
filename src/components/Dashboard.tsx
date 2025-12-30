@@ -9,7 +9,15 @@ import EmergencyAlertWidget from './EmergencyAlertWidget';
 import apiUrl from '@/config/api';
 
 // --- 3D Stat Card Component ---
-const StatCard = ({ title, value, icon: Icon, color, trend }) => {
+interface StatCardProps {
+  title: string;
+  value: string;
+  icon: any;
+  color: string;
+  trend?: string;
+}
+
+const StatCard: React.FC<StatCardProps> = ({ title, value, icon: Icon, color, trend }) => {
   // Random delay for stagger effect
   const delay = Math.random() * 0.5;
 
@@ -51,14 +59,32 @@ const StatCard = ({ title, value, icon: Icon, color, trend }) => {
   );
 };
 
-const QuickAction = ({ label, icon: Icon, onClick }) => (
+interface QuickActionProps {
+  label: string;
+  icon: any;
+  onClick: () => void;
+}
+
+const QuickAction: React.FC<QuickActionProps> = ({ label, icon: Icon, onClick }) => (
   <button onClick={onClick} className="flex items-center space-x-3 text-left w-full p-3 rounded-lg transition-colors bg-muted/50 hover:bg-muted text-foreground">
     <Icon className="w-5 h-5 text-muted-foreground" />
     <span className="font-semibold">{label}</span>
   </button>
 );
 
-export default function Dashboard({ setActiveModule }) {
+interface AgendaItem {
+  id: string;
+  appointmentDate: string;
+  notes: string;
+  patientName: string;
+  status: string;
+}
+
+interface DashboardProps {
+  setActiveModule: (module: string) => void;
+}
+
+export default function Dashboard({ setActiveModule }: DashboardProps) {
   const { theme } = useTheme();
   const [stats, setStats] = useState({
     totalPatients: 0,
@@ -66,9 +92,9 @@ export default function Dashboard({ setActiveModule }) {
     availableBeds: 0,
     revenue: 0,
   });
-  const [agenda, setAgenda] = useState([]);
+  const [agenda, setAgenda] = useState<AgendaItem[]>([]);
   const [timeOfDay, setTimeOfDay] = useState('Morning');
-  const { translate } = useLanguage();
+  const { translate } = useLanguage() as any; // Temporary fix if translate type is unknown
   const [currentDate, setCurrentDate] = useState('');
   const [waitTime, setWaitTime] = useState(0);
 
@@ -225,46 +251,46 @@ export default function Dashboard({ setActiveModule }) {
             </div>
 
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
                 <span className="relative flex h-4 w-4">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500"></span>
                 </span>
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-200 to-white drop-shadow-lg">
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-blue-400 dark:from-blue-200 dark:to-white drop-shadow-sm">
                   Live ICU Monitoring
                 </span>
               </h2>
-              <div className="text-xs px-3 py-1 rounded-full bg-white/5 border border-white/10 text-blue-200 font-mono">
+              <div className="text-xs px-3 py-1 rounded-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-blue-600 dark:text-blue-200 font-mono">
                 ID: ICU-WARD-01
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* Heart Rate 3D Module */}
-              <div className="relative bg-gradient-to-b from-gray-800/50 to-gray-900/80 p-5 rounded-2xl border border-white/5 shadow-inner">
-                <p className="text-gray-400 text-xs uppercase tracking-widest mb-2 font-semibold">Heart Rate</p>
+              <div className="relative bg-white/50 dark:bg-gradient-to-b dark:from-gray-800/50 dark:to-gray-900/80 p-5 rounded-2xl border border-black/5 dark:border-white/5 shadow-inner">
+                <p className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-widest mb-2 font-semibold">Heart Rate</p>
                 <div className="flex items-end gap-3">
-                  <span className="text-5xl font-black text-white drop-shadow-[0_0_10px_rgba(239,68,68,0.5)]">{heartRate}</span>
-                  <span className="text-sm text-red-400 mb-2 font-bold">BPM</span>
+                  <span className="text-5xl font-black text-gray-900 dark:text-white drop-shadow-sm dark:drop-shadow-[0_0_10px_rgba(239,68,68,0.5)]">{heartRate}</span>
+                  <span className="text-sm text-red-500 dark:text-red-400 mb-2 font-bold">BPM</span>
                 </div>
                 {/* Dynamic ECG Canvas */}
                 <div className="w-full h-16 mt-4 flex items-end justify-between gap-1 opacity-80">
                   {ecgData.map((val, i) => (
-                    <div key={i} className="w-full bg-gradient-to-t from-red-600 to-red-400 rounded-t-sm shadow-[0_0_8px_rgba(239,68,68,0.6)]"
+                    <div key={i} className="w-full bg-gradient-to-t from-red-600 to-red-400 rounded-t-sm shadow-sm"
                       style={{ height: `${val}%`, opacity: (i / ecgData.length) + 0.2 }}></div>
                   ))}
                 </div>
               </div>
 
               {/* Oxygen 3D Module */}
-              <div className="relative bg-gradient-to-b from-gray-800/50 to-gray-900/80 p-5 rounded-2xl border border-white/5 shadow-inner">
-                <p className="text-gray-400 text-xs uppercase tracking-widest mb-2 font-semibold">Oxygen Saturation</p>
+              <div className="relative bg-white/50 dark:bg-gradient-to-b dark:from-gray-800/50 dark:to-gray-900/80 p-5 rounded-2xl border border-black/5 dark:border-white/5 shadow-inner">
+                <p className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-widest mb-2 font-semibold">Oxygen Saturation</p>
                 <div className="flex items-end gap-3">
-                  <span className="text-5xl font-black text-white drop-shadow-[0_0_10px_rgba(59,130,246,0.5)]">{oxygenLevel}</span>
-                  <span className="text-sm text-blue-400 mb-2 font-bold">% SpO2</span>
+                  <span className="text-5xl font-black text-gray-900 dark:text-white drop-shadow-sm dark:drop-shadow-[0_0_10px_rgba(59,130,246,0.5)]">{oxygenLevel}</span>
+                  <span className="text-sm text-blue-500 dark:text-blue-400 mb-2 font-bold">% SpO2</span>
                 </div>
                 {/* Liquid Gauge Simulation */}
-                <div className="w-full bg-gray-700/50 h-3 rounded-full mt-8 overflow-hidden border border-white/5 relative">
+                <div className="w-full bg-gray-200 dark:bg-gray-700/50 h-3 rounded-full mt-8 overflow-hidden border border-black/5 dark:border-white/5 relative">
                   <div className="absolute inset-0 bg-blue-500/20 animate-pulse"></div>
                   <div className="bg-gradient-to-r from-blue-600 to-cyan-400 h-full transition-all duration-700 shadow-[0_0_15px_rgba(34,211,238,0.6)]"
                     style={{ width: `${oxygenLevel}%` }}></div>
@@ -272,12 +298,12 @@ export default function Dashboard({ setActiveModule }) {
               </div>
 
               {/* Status 3D Module */}
-              <div className="relative bg-gradient-to-b from-gray-800/50 to-gray-900/80 p-5 rounded-2xl border border-white/5 shadow-inner flex flex-col justify-center items-center">
+              <div className="relative bg-white/50 dark:bg-gradient-to-b dark:from-gray-800/50 dark:to-gray-900/80 p-5 rounded-2xl border border-black/5 dark:border-white/5 shadow-inner flex flex-col justify-center items-center">
                 <div className="w-20 h-20 rounded-full bg-green-500/10 border-2 border-green-500/30 flex items-center justify-center mb-3 shadow-[0_0_30px_rgba(34,197,94,0.2)] animate-pulse">
-                  <Activity className="text-green-400 w-10 h-10" />
+                  <Activity className="text-green-600 dark:text-green-400 w-10 h-10" />
                 </div>
-                <span className="text-green-300 font-bold tracking-wider text-sm">SYSTEM STABLE</span>
-                <span className="text-xs text-green-500/60 mt-1 font-mono">Uptime: 99.9%</span>
+                <span className="text-green-700 dark:text-green-300 font-bold tracking-wider text-sm">SYSTEM STABLE</span>
+                <span className="text-xs text-green-600/70 dark:text-green-500/60 mt-1 font-mono">Uptime: 99.9%</span>
               </div>
             </div>
           </div>

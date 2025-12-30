@@ -8,10 +8,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, MapPin, Edit, ArrowLeft } from 'lucide-react';
+import { Loader2, MapPin, Edit, ArrowLeft, Camera, Upload } from 'lucide-react';
 import ParamedicMapView from '../../components/ems/ParamedicMapView';
 
-const BookAmbulance = ({ user }) => {
+const BookAmbulance = ({ user }: { user: any }) => {
   const navigate = useNavigate();
   const { position, error: geoError, startTracking } = useGeolocation();
   const [notes, setNotes] = useState('');
@@ -21,6 +21,8 @@ const BookAmbulance = ({ user }) => {
   const [manualAddress, setManualAddress] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [availableAmbulances, setAvailableAmbulances] = useState([]);
+  const [accidentImage, setAccidentImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   useEffect(() => {
     const checkActiveTrip = async () => {
@@ -57,7 +59,19 @@ const BookAmbulance = ({ user }) => {
 
   const handleGetLocation = () => {
     setBookingStatus('locating');
-    startTracking();
+    startTracking((pos) => console.log("Tracking", pos));
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setAccidentImage(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleBookNow = async () => {
@@ -93,15 +107,19 @@ const BookAmbulance = ({ user }) => {
     setBookingStatus('booking');
     setErrorMessage('');
     try {
+      // Use FormData for image upload
+      const formData = new FormData();
+      formData.append('patient_id', user.id);
+      formData.append('latitude', lat.toString());
+      formData.append('longitude', lon.toString());
+      formData.append('notes', notes);
+      if (accidentImage) {
+        formData.append('accidentImage', accidentImage);
+      }
+
       const response = await fetch(apiUrl('/api/ems/patient/book-ambulance'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          patient_id: user.id,
-          latitude: lat,
-          longitude: lon,
-          notes: notes,
-        }),
+        body: formData, // No Content-Type header needed for FormData
       });
       const data = await response.json();
       if (data.success) {
@@ -162,7 +180,7 @@ const BookAmbulance = ({ user }) => {
         );
       case 'success':
         return (
-          <Alert variant="success">
+          <Alert className="border-green-500 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300">
             <AlertTitle>Booking Successful!</AlertTitle>
             <AlertDescription>
               Help is on the way. Redirecting you to the tracking page...
@@ -181,7 +199,7 @@ const BookAmbulance = ({ user }) => {
     }
   };
 
-  const renderBookingForm = (locationMessage) => (
+  const renderBookingForm = (locationMessage: string) => (
     <div className="space-y-4">
       <Alert>
         <AlertTitle>Location</AlertTitle>
@@ -200,6 +218,35 @@ const BookAmbulance = ({ user }) => {
           />
         </div>
       )}
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          Accident Photo (Optional)
+        </label>
+        <div className="flex gap-4 items-start">
+          <input
+            type="file"
+            accept="image/*"
+            id="accident-photo"
+            className="hidden"
+            onChange={handleImageChange}
+          />
+          <label
+            htmlFor="accident-photo"
+            className="flex flex-col items-center justify-center w-24 h-24 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+          >
+            <Camera className="w-8 h-8 text-gray-400 mb-1" />
+            <span className="text-[10px] text-gray-500 font-bold uppercase">Upload</span>
+          </label>
+
+          {imagePreview && (
+            <div className="relative w-24 h-24 rounded-xl overflow-hidden border-2 border-green-500 shadow-md">
+              <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+            </div>
+          )}
+        </div>
+      </div>
+
       <div>
         <label htmlFor="notes" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
           Notes for the Paramedic (Optional):
@@ -211,8 +258,8 @@ const BookAmbulance = ({ user }) => {
           placeholder="e.g., Patient is on the 2nd floor, difficulty breathing."
         />
       </div>
-      <Button onClick={handleBookNow} className="w-full" size="lg" disabled={bookingStatus === 'booking'}>
-        Book Ambulance Now
+      <Button onClick={handleBookNow} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold" size="lg" disabled={bookingStatus === 'booking'}>
+        <Upload className="mr-2 h-4 w-4" /> Book & Upload SOS
       </Button>
     </div>
   );

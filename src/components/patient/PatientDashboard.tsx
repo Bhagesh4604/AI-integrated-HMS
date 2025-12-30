@@ -61,7 +61,7 @@ const StatCard = ({ title, value, icon: Icon, colorClass = "text-blue-500", bgCl
 export default function PatientDashboard({ patient, onLogout, updateUser }) {
     const { theme, toggleTheme } = useTheme();
     const [activeTab, setActiveTab] = useState('dashboard');
-    const [isSidebarOpen, setSidebarOpen] = useState(false);
+    const [isSidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 1024);
     const [appointments, setAppointments] = useState([]);
     const [records, setRecords] = useState([]);
     const [billing, setBilling] = useState([]);
@@ -554,17 +554,25 @@ export default function PatientDashboard({ patient, onLogout, updateUser }) {
                 return (
                     <div className="space-y-6">
                         <h2 className="text-3xl font-bold dark:text-white">Lab Results</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {labResults.map(lab => (
-                                <GlassCard key={lab.resultId} className="p-6 relative overflow-hidden">
-                                    <div className="absolute top-0 right-0 p-4 opacity-10"><Beaker size={64} /></div>
-                                    <h3 className="font-bold text-lg dark:text-white relative z-10">{lab.testName}</h3>
-                                    <p className="text-3xl font-bold text-teal-500 my-2 relative z-10">{lab.resultValue} <span className="text-sm text-gray-400 font-normal">{lab.unit}</span></p>
-                                    <p className="text-sm text-gray-500 relative z-10">Ref: {lab.referenceRange}</p>
-                                    <p className="text-xs text-gray-400 mt-4 relative z-10">{new Date(lab.resultDate).toLocaleDateString()}</p>
-                                </GlassCard>
-                            ))}
-                        </div>
+                        {labResults.length > 0 ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {labResults.map(lab => (
+                                    <GlassCard key={lab.resultId} className="p-6 relative overflow-hidden">
+                                        <div className="absolute top-0 right-0 p-4 opacity-10"><Beaker size={64} /></div>
+                                        <h3 className="font-bold text-lg dark:text-white relative z-10">{lab.testName}</h3>
+                                        <p className="text-3xl font-bold text-teal-500 my-2 relative z-10">{lab.resultValue} <span className="text-sm text-gray-400 font-normal">{lab.unit}</span></p>
+                                        <p className="text-sm text-gray-500 relative z-10">Ref: {lab.referenceRange}</p>
+                                        <p className="text-xs text-gray-400 mt-4 relative z-10">{new Date(lab.resultDate).toLocaleDateString()}</p>
+                                    </GlassCard>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="text-center py-20 bg-white/5 rounded-3xl border border-white/10 backdrop-blur-sm">
+                                <Beaker className="w-20 h-20 text-gray-600 mx-auto mb-4 opacity-50" />
+                                <h3 className="text-2xl font-bold text-gray-500">No lab results found</h3>
+                                <p className="text-gray-400 mt-2">Your test results will appear here once they are ready.</p>
+                            </div>
+                        )}
                     </div>
                 );
             default:

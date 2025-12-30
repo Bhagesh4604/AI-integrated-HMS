@@ -5,7 +5,7 @@ import useGeolocation from '../hooks/useGeolocation';
 import ParamedicMapView from '../components/ems/ParamedicMapView';
 import usePushNotifications from '../hooks/usePushNotifications';
 import useSpeechRecognition from '../hooks/useSpeechRecognition';
-import { Heart, Activity, FileText, CheckCircle, AlertTriangle, MapPin, Navigation, Building, Flag, Clock, Ambulance, History, XCircle, Sparkles, X, Mic, MicOff, Stethoscope } from 'lucide-react';
+import { Heart, Activity, FileText, CheckCircle, AlertTriangle, MapPin, Navigation, Building, Flag, Clock, Ambulance, History, XCircle, Sparkles, X, Mic, MicOff, Stethoscope, Camera } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // --- Interfaces ---
@@ -27,6 +27,9 @@ interface Trip {
   scene_location_lon: number;
   alert_timestamp: string;
   notes?: string;
+  trip_image_url?: string;
+  verification_status?: string;
+  verification_reason?: string;
 }
 
 interface Shift {
@@ -191,6 +194,7 @@ const ParamedicMode: React.FC<ParamedicModeProps> = ({ user }) => {
   const [handoverReport, setHandoverReport] = useState('');
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [showHandoverModal, setShowHandoverModal] = useState(false);
+  const [showScenePhoto, setShowScenePhoto] = useState(false);
 
   const { position, error: geoError, startTracking, stopTracking } = useGeolocation();
   const { error: pushError } = usePushNotifications(user?.id);
@@ -392,6 +396,12 @@ const ParamedicMode: React.FC<ParamedicModeProps> = ({ user }) => {
           </div>
         </div>
         <div className="flex gap-2">
+          {myTrip?.trip_image_url && (
+            <button onClick={() => setShowScenePhoto(true)} className="p-3 bg-blue-500/20 text-blue-400 hover:bg-blue-500 hover:text-white rounded-full transition-colors relative group">
+              <Camera size={20} />
+              <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+            </button>
+          )}
           <button onClick={handleViewHistory} className="p-3 bg-white/5 hover:bg-white/10 rounded-full transition-colors"><History size={20} /></button>
           <button onClick={handleClockOut} className="p-3 bg-red-500/20 text-red-400 hover:bg-red-500 hover:text-white rounded-full transition-colors"><XCircle size={20} /></button>
         </div>
@@ -551,6 +561,52 @@ const ParamedicMode: React.FC<ParamedicModeProps> = ({ user }) => {
           <h2 className="text-2xl font-bold">Standby Mode</h2>
           <p className="text-gray-400 mt-2">Monitoring dispatcher frequency...</p>
         </div>
+      )}
+      {showScenePhoto && myTrip?.trip_image_url && (
+        <AnimatePresence>
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[600] p-4"
+            onClick={() => setShowScenePhoto(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
+              className="relative max-w-[90vw] max-h-[90vh] rounded-2xl overflow-hidden border border-white/20 shadow-2xl bg-black"
+              onClick={e => e.stopPropagation()}
+            >
+              <button onClick={() => setShowScenePhoto(false)} className="absolute top-4 right-4 p-2 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors z-10">
+                <X size={24} />
+              </button>
+              <img src={apiUrl(myTrip.trip_image_url)} alt="Accident Scene" className="w-auto h-auto max-w-full max-h-[90vh] object-contain" />
+              <div className="absolute top-4 left-4 z-20">
+                {myTrip.verification_status === 'Verified' && (
+                  <span className="px-3 py-1.5 rounded-full bg-green-500/90 text-white text-sm font-bold backdrop-blur-md shadow-lg flex items-center gap-2 border border-green-400/50">
+                    <CheckCircle size={14} /> Verified Accident
+                  </span>
+                )}
+                {myTrip.verification_status === 'Suspected Fake' && (
+                  <span className="px-3 py-1.5 rounded-full bg-red-500/90 text-white text-sm font-bold backdrop-blur-md shadow-lg flex items-center gap-2 border border-red-400/50">
+                    <AlertTriangle size={14} /> AI Flagged: Fake
+                  </span>
+                )}
+                {myTrip.verification_status === 'Error' && (
+                  <span className="px-3 py-1.5 rounded-full bg-gray-600/90 text-white text-sm font-bold backdrop-blur-md shadow-lg flex items-center gap-2 border border-gray-400/50">
+                    <AlertTriangle size={14} /> AI Unavailable
+                  </span>
+                )}
+              </div>
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-6 pt-12">
+                <h3 className="text-white text-xl font-bold flex items-center gap-2"><Camera size={20} /> Scene Photo</h3>
+                {myTrip.verification_reason && (
+                  <p className="text-yellow-300 font-medium text-sm mt-1 bg-black/40 inline-block px-2 py-1 rounded-lg backdrop-blur-sm border border-white/10">
+                    AI Analysis: {myTrip.verification_reason}
+                  </p>
+                )}
+                <p className="text-gray-400 text-xs mt-2">Uploaded by patient at scene.</p>
+              </div>
+            </motion.div>
+          </motion.div>
+        </AnimatePresence>
       )}
     </div>
   );

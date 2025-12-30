@@ -174,9 +174,8 @@ router.post('/forgot-password', (req, res) => {
     });
 });
 
-const { OAuth2Client } = require('google-auth-library');
-
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+// const { OAuth2Client } = require('google-auth-library');
+// const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // Reset Password
 router.post('/reset-password', (req, res) => {
@@ -210,63 +209,6 @@ router.post('/reset-password', (req, res) => {
     });
 });
 
-// Google Login
-router.post('/google-login', async (req, res) => {
-    const { idToken } = req.body;
 
-    try {
-        const ticket = await client.verifyIdToken({
-            idToken,
-            audience: process.env.GOOGLE_CLIENT_ID,
-        });
-        const payload = ticket.getPayload();
-        const { email, given_name, family_name, picture } = payload;
-
-        const patientSql = 'SELECT * FROM patients WHERE email = ?';
-        executeQuery(patientSql, [email], async (err, results) => {
-            if (err) {
-                console.error("DB Error on Google login:", err);
-                return res.status(500).json({ success: false, message: 'Internal server error.' });
-            }
-
-            let patient = results[0];
-
-            if (!patient) {
-                const patientId = `PAT${Math.floor(1000 + Math.random() * 9000)}`;
-                const insertPatientSql = 'INSERT INTO patients (patientId, firstName, lastName, email, profileImageUrl, status) VALUES (?, ?, ?, ?, ?, ?)';
-                const insertResult = await new Promise((resolve, reject) => {
-                    executeQuery(insertPatientSql, [patientId, given_name, family_name, email, picture, 'active'], (insertErr, result) => {
-                        if (insertErr) return reject(insertErr);
-                        resolve(result);
-                    });
-                });
-
-                const newPatientId = insertResult.insertId;
-
-                const authSql = 'INSERT INTO patients_auth (patientId, email) VALUES (?, ?)';
-                await new Promise((resolve, reject) => {
-                    executeQuery(authSql, [newPatientId, email], (authErr, authResult) => {
-                        if (authErr) return reject(authErr);
-                        resolve(authResult);
-                    });
-                });
-
-                const newPatientResults = await new Promise((resolve, reject) => {
-                    executeQuery(patientSql, [email], (fetchErr, fetchResults) => {
-                        if (fetchErr) return reject(fetchErr);
-                        resolve(fetchResults);
-                    });
-                });
-                patient = newPatientResults[0];
-            }
-
-            res.json({ success: true, message: 'Google login successful!', patient: patient });
-        });
-
-    } catch (error) {
-        console.error('Google ID token verification failed:', error);
-        res.status(401).json({ success: false, message: 'Google login failed. Invalid token.' });
-    }
-});
 
 module.exports = router;

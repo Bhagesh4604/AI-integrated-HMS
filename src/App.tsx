@@ -34,6 +34,7 @@ import ERDashboard from './pages/ERDashboard'; // New ER Dashboard
 import EmsLayout from './components/ems/EmsLayout'; // New EMS Layout
 import DoctorCardiacMonitor from './pages/DoctorCardiacMonitor'; // New Cardiac Monitor
 import OncologyScreening from './components/OncologyScreening'; // New Oncology Module
+import IoTDeviceSimulator from './pages/IoTDeviceSimulator'; // IoT Simulator
 
 // --- AUTH & ROUTING IMPORTS ---
 import StaffLogin from './components/auth/StaffLogin';
@@ -46,15 +47,29 @@ import ProtectedRoute from './components/auth/ProtectedRoute';
 // --- THEME IMPORTS ---
 import { useTheme } from './context/ThemeContext';
 import { Button } from './components/ui/button';
-import { Sun, Moon } from 'lucide-react';
+import { Sun, Moon, Menu } from 'lucide-react';
 
 // --- Main Staff Application Structure ---
-const MainApplication = ({ user, onLogout, updateUser }) => {
+interface User {
+  role: string;
+  firstName: string;
+  lastName: string;
+  profileImageUrl?: string;
+  [key: string]: any;
+}
+
+interface MainApplicationProps {
+  user: User;
+  onLogout: () => void;
+  updateUser: (data: any) => void;
+}
+
+const MainApplication: React.FC<MainApplicationProps> = ({ user, onLogout, updateUser }) => {
   const [activeModule, setActiveModule] = useState('dashboard');
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const { toggleTheme } = useTheme();
 
-  const handleModuleChange = (module) => {
+  const handleModuleChange = (module: string) => {
     if (module !== activeModule) {
       setActiveModule(module);
     }
@@ -104,12 +119,17 @@ const MainApplication = ({ user, onLogout, updateUser }) => {
     <div className="flex h-screen bg-background text-foreground overflow-hidden font-sans">
       <NewSidebar activeModule={activeModule} setActiveModule={handleModuleChange} userType={user.role} onLogout={onLogout} user={user} isSidebarOpen={isSidebarOpen} setSidebarOpen={setSidebarOpen} />
       <div className="relative flex-1 flex flex-col overflow-hidden">
-        <header className="bg-white dark:bg-gray-800 shadow-md pt-6">
+        <header className="relative z-30 bg-white dark:bg-gray-800 shadow-md pt-6">
           <div className="flex justify-between items-center p-4">
-            <button onClick={() => setSidebarOpen(!isSidebarOpen)}>
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-800 dark:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
+            <button
+              onClick={() => {
+                console.log('Toggle Sidebar Clicked');
+                setSidebarOpen(!isSidebarOpen);
+              }}
+              className="p-2 mr-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 relative z-50 pointer-events-auto"
+              aria-label="Toggle Sidebar"
+            >
+              <Menu className="h-6 w-6 text-gray-800 dark:text-white" />
             </button>
             <h1 className="text-lg font-bold text-gray-900 dark:text-white">Shree Medicare</h1>
             <Button variant="ghost" size="icon" onClick={toggleTheme}>
@@ -133,11 +153,11 @@ import VoiceController from './components/VoiceController';
 
 // --- Root App Component ---
 function App() {
-  const [loggedInUser, setLoggedInUser] = useState(null);
+  const [loggedInUser, setLoggedInUser] = useState<User | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
 
-  const navigateToDashboard = useCallback((user) => {
+  const navigateToDashboard = useCallback((user: User) => {
     switch (user.role) {
       case 'patient':
         navigate('/patient-dashboard');
@@ -161,7 +181,7 @@ function App() {
     }
   }, [navigate]);
 
-  const handleLogin = (user) => {
+  const handleLogin = (user: any) => {
     const userWithRole = user.role ? user : { ...user, role: 'patient' };
     localStorage.setItem('loggedInUser', JSON.stringify(userWithRole));
     setLoggedInUser(userWithRole);
@@ -179,10 +199,12 @@ function App() {
     navigate('/');
   };
 
-  const updateLoggedInUser = (updatedData) => {
-    const updatedUser = { ...loggedInUser, ...updatedData };
-    localStorage.setItem('loggedInUser', JSON.stringify(updatedUser));
-    setLoggedInUser(updatedUser);
+  const updateLoggedInUser = (updatedData: any) => {
+    if (loggedInUser) {
+      const updatedUser = { ...loggedInUser, ...updatedData };
+      localStorage.setItem('loggedInUser', JSON.stringify(updatedUser));
+      setLoggedInUser(updatedUser);
+    }
   };
 
   return (
@@ -257,6 +279,14 @@ function App() {
               <EmsLayout user={loggedInUser} onLogout={handleLogout}>
                 <ERDashboard />
               </EmsLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/iot-simulator"
+          element={
+            <ProtectedRoute user={loggedInUser} allowedRoles={['admin', 'ROLE_DISPATCHER', 'patient']}>
+              <IoTDeviceSimulator />
             </ProtectedRoute>
           }
         />

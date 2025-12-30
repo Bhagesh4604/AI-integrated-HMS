@@ -26,12 +26,24 @@ export default function EmergencyAlertWidget() {
       try {
         const response = await fetch(apiUrl('/api/ems/live-alerts'));
         const data = await response.json();
-        
+
         if (data.success && Array.isArray(data.alerts) && data.alerts.length > 0) {
           // Get the most recent alert
           const latestAlert = data.alerts[0];
-          setAlert(latestAlert);
-          setIsDismissed(false);
+
+          // Check if this specific alert ID has been dismissed
+          const dismissedAlerts = JSON.parse(localStorage.getItem('dismissedAlerts') || '[]');
+
+          if (!dismissedAlerts.includes(latestAlert.trip_id)) {
+            // Only update if it's a new alert or different from current
+            setAlert(prev => {
+              if (prev?.trip_id !== latestAlert.trip_id) {
+                setIsDismissed(false); // Reset dismissal only for NEW alerts
+                return latestAlert;
+              }
+              return prev;
+            });
+          }
         } else {
           // Empty array means no alerts
           setAlert(null);
@@ -51,8 +63,14 @@ export default function EmergencyAlertWidget() {
   }, []);
 
   const handleDismiss = () => {
-    setIsDismissed(true);
-    setAlert(null);
+    if (alert?.trip_id) {
+      setIsDismissed(true);
+      const dismissedAlerts = JSON.parse(localStorage.getItem('dismissedAlerts') || '[]');
+      if (!dismissedAlerts.includes(alert.trip_id)) {
+        dismissedAlerts.push(alert.trip_id);
+        localStorage.setItem('dismissedAlerts', JSON.stringify(dismissedAlerts));
+      }
+    }
   };
 
   const handleViewDetails = () => {
@@ -60,7 +78,7 @@ export default function EmergencyAlertWidget() {
       // Navigate to fleet management dashboard with trip ID
       // Using React Router navigate to maintain session (no full page reload)
       try {
-        navigate(`/fleet-management?trip=${alert.trip_id}`, { 
+        navigate(`/fleet-management?trip=${alert.trip_id}`, {
           replace: false,
           state: { fromAlert: true, tripId: alert.trip_id }
         });
@@ -80,16 +98,16 @@ export default function EmergencyAlertWidget() {
   return (
     <AnimatePresence>
       <motion.div
-        initial={{ opacity: 0, y: -100 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -100 }}
-        className="fixed top-0 left-0 right-0 z-[9999] px-4 pt-4 pb-2"
+        initial={{ opacity: 0, y: -20, height: 0 }}
+        animate={{ opacity: 1, y: 0, height: 'auto' }}
+        exit={{ opacity: 0, y: -20, height: 0 }}
+        className="w-full z-40 px-4 pt-4 pb-2 mb-6"
       >
         <div className="max-w-7xl mx-auto">
           <div className="bg-gradient-to-r from-red-700 to-red-800 text-white rounded-2xl shadow-2xl border-4 border-red-400 overflow-hidden relative">
             {/* Pulsing border effect */}
             <div className="absolute inset-0 border-4 border-red-500 rounded-2xl animate-pulse opacity-75"></div>
-            
+
             <div className="relative p-6 md:p-8">
               {/* Header */}
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">

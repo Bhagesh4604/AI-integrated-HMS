@@ -5,36 +5,23 @@ const path = require('path');
 const http = require('http');
 const WebSocket = require('ws');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
-const admin = require('firebase-admin'); // Import firebase-admin
+// Azure Notification Hubs Setup
+const { NotificationHubsClient } = require("@azure/notification-hubs");
 
-// Initialize Firebase Admin SDK
-if (process.env.FIREBASE_SERVICE_ACCOUNT_BASE64) {
+let notificationHubService = null;
+
+if (process.env.AZURE_NH_CONNECTION_STRING && process.env.AZURE_NH_HUB_NAME) {
   try {
-    const serviceAccountString = Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_BASE64, 'base64').toString('ascii');
-    const serviceAccount = JSON.parse(serviceAccountString);
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
-    });
-    console.log("✅ Firebase Admin SDK initialized from Base64 variable.");
+    notificationHubService = new NotificationHubsClient(
+      process.env.AZURE_NH_CONNECTION_STRING,
+      process.env.AZURE_NH_HUB_NAME
+    );
+    console.log("✅ Azure Notification Hubs client initialized.");
   } catch (e) {
-    console.error("🔴 Firebase Admin SDK initialization from Base64 failed:", e);
-  }
-} else if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
-  try {
-    const serviceAccount = {
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-    };
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
-    });
-    console.log("✅ Firebase Admin SDK initialized from individual environment variables.");
-  } catch (e) {
-    console.error("🔴 Firebase Admin SDK initialization from individual env vars failed:", e);
+    console.error("🔴 Azure Notification Hubs initialization failed:", e);
   }
 } else {
-  console.warn("⚠️ Firebase credentials not found in environment variables. Push notifications will be disabled.");
+  console.warn("⚠️ Azure Notification Hub (AZURE_NH_CONNECTION_STRING, AZURE_NH_HUB_NAME) configuration missing. Push notifications disabled.");
 }
 
 
@@ -44,10 +31,15 @@ const wss = new WebSocket.Server({ server });
 
 // Make wss available to other modules
 app.set('wss', wss);
-app.set('firebaseAdmin', admin); // Make firebaseAdmin available to other modules
+app.set('notificationHubService', notificationHubService);
 
 wss.on('connection', (ws) => {
   console.log('✅ Client connected to WebSocket');
+
+  ws.isAlive = true;
+  ws.on('pong', () => {
+    ws.isAlive = true;
+  });
 
   ws.on('close', (code, reason) => {
     console.log(`❌ Client disconnected from WebSocket. Code: ${code}, Reason: ${reason}`);
@@ -56,6 +48,20 @@ wss.on('connection', (ws) => {
   ws.on('error', (error) => {
     console.error('❌ WebSocket error:', error);
   });
+});
+
+// Keep-Alive Heartbeat
+const interval = setInterval(() => {
+  wss.clients.forEach((ws) => {
+    if (ws.isAlive === false) return ws.terminate();
+
+    ws.isAlive = false;
+    ws.ping();
+  });
+}, 30000);
+
+wss.on('close', () => {
+  clearInterval(interval);
 });
 
 // --- CHANGE 1: Use Render's environment variable for PORT ---
@@ -89,6 +95,8 @@ app.use((req, res, next) => {
 
 // Serve static files from the React app build directory
 app.use(express.static(path.join(__dirname, '..', 'dist')));
+// Serve uploads directory
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // The "catchall" handler: for any request that doesn't
 // match one above, send back React's index.html file.
@@ -127,8 +135,8 @@ app.use('/api/ai', require('./aiService.cjs'));
 app.use('/api/analytics', require('./analytics.cjs'));
 app.use('/api/triage', require('./triage.cjs'));
 app.use('/api/beds', require('./beds.cjs'));
+app.use('/api/ems/patient', require('./ems_patient.cjs')); // New Patient-facing EMS routes (Must come before generic EMS)
 app.use('/api/ems', require('./ems.cjs')); // New EMS routes
-app.use('/api/ems/patient', require('./ems_patient.cjs')); // New Patient-facing EMS routes
 app.use('/api/speech', require('./speechToken.cjs')); // Azure Speech Token
 app.use('/api/agent', require('./agentService.cjs')); // NEW AI AGENT
 app.use('/api/health', require('./healthCheck.cjs')); // Health Check logic

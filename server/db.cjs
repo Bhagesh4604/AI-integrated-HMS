@@ -9,8 +9,8 @@ const pool = mysql.createPool({
   password: process.env.MYSQL_ADDON_PASSWORD || process.env.DB_PASSWORD,
   database: process.env.MYSQL_ADDON_DB || process.env.DB_NAME,
   timezone: 'UTC',
-  ssl: process.env.DB_SSL === 'true' ? {
-      rejectUnauthorized: false
+  ssl: (process.env.DB_SSL === 'true' || (process.env.DB_HOST && process.env.DB_HOST.includes('azure.com'))) ? {
+    rejectUnauthorized: false
   } : undefined
 });
 
@@ -24,7 +24,7 @@ const executeQuery = (query, params, callback) => {
       // Ensure callback is called and we don't proceed
       return callback(err, null, null);
     }
-    
+
     connection.query(query, params, (err, results, fields) => {
       // Always release the connection back to the pool
       connection.release();
@@ -38,7 +38,7 @@ const executeQuery = (query, params, callback) => {
         console.error('Stack:', new Error().stack);
         console.error('--- END DATABASE QUERY ERROR ---');
       }
-      
+
       // Pass the original arguments to the callback
       callback(err, results, fields);
     });

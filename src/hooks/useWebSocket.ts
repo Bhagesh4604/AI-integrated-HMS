@@ -5,39 +5,57 @@ const useWebSocket = (onMessage) => {
   const ws = useRef(null);
 
   useEffect(() => {
-    // 2. Construct WebSocket URL from API_BASE
-    const wsUrl = API_BASE.replace(/^http/, 'ws');
-    
-    ws.current = new WebSocket(wsUrl);
+    let reconnectTimeout;
+    let wsInstance;
 
-    ws.current.onopen = () => {
-      console.log('WebSocket connected to:', wsUrl);
-    };
+    const connect = () => {
+      // 2. Construct WebSocket URL from API_BASE
+      const wsUrl = API_BASE.replace(/^http/, 'ws');
 
-    ws.current.onclose = (event) => {
-      console.log('WebSocket disconnected:', event.reason, `Code: ${event.code}`);
-    };
+      wsInstance = new WebSocket(wsUrl);
+      ws.current = wsInstance;
 
-    ws.current.onmessage = (event) => {
-      console.log('Raw WebSocket message received:', event.data);
-      try {
-        const message = JSON.parse(event.data);
-        if (onMessage) {
-          onMessage(message);
+      wsInstance.onopen = () => {
+        console.log('WebSocket connected to:', wsUrl);
+      };
+
+      wsInstance.onclose = (event) => {
+        console.log('WebSocket disconnected:', event.reason, `Code: ${event.code}`);
+        // Attempt to reconnect after 3 seconds
+        reconnectTimeout = setTimeout(() => {
+          console.log('Attempting to reconnect WebSocket...');
+          connect();
+        }, 3000);
+      };
+
+      wsInstance.onmessage = (event) => {
+        // console.log('Raw WebSocket message received:', event.data);
+        try {
+          const message = JSON.parse(event.data);
+          if (onMessage) {
+            onMessage(message);
+          }
+        } catch (error) {
+          console.error('Failed to parse WebSocket message:', error);
         }
-      } catch (error) {
-        console.error('Failed to parse WebSocket message:', error);
-      }
+      };
+
+      wsInstance.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        // Close event will be triggered, which handles reconnection
+      };
     };
 
-    ws.current.onerror = (error) => {
-      console.error('WebSocket error:', error);
-    };
+    connect();
 
     // Cleanup on unmount
     return () => {
-      if (ws.current) {
-        ws.current.close();
+      if (wsInstance) {
+        wsInstance.onclose = null; // Prevent reconnection attempt on unmount
+        wsInstance.close();
+      }
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
       }
     };
   }, [onMessage]);

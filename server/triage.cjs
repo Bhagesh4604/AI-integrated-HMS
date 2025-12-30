@@ -30,7 +30,7 @@ async function runAzureOpenAI(userQuery, systemPrompt) {
 
         const result = await client.chat.completions.create({
             messages: messages,
-            model: "",
+            model: "gpt-4o",
         });
 
         return result.choices[0].message.content;

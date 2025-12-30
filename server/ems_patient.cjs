@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const { executeQuery } = require('./db.cjs');
 const WebSocket = require('ws');
+const { AzureOpenAI } = require("openai");
+const { Jimp } = require('jimp');
 
 // Helper function to broadcast to all clients
 const broadcast = (wss, data) => {
@@ -138,8 +140,41 @@ async function autoDispatchTrip(trip_id, scene_location, wss) {
 
 // --- API Endpoints ---
 
-router.post('/book-ambulance', async (req, res) => {
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+// Configure Multer for image uploads
+const uploadDir = path.join(__dirname, '../uploads/accidents');
+// Ensure directory exists
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'accident-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({ storage: storage });
+
+// Initialize Azure OpenAI Client
+const client = new AzureOpenAI({
+  endpoint: process.env.AZURE_OPENAI_ENDPOINT,
+  apiKey: process.env.AZURE_OPENAI_API_KEY,
+  apiVersion: "2024-05-01-preview",
+  deployment: process.env.AZURE_OPENAI_DEPLOYMENT_ID // "gpt-4o"
+});
+
+router.post('/book-ambulance', upload.single('accidentImage'), async (req, res) => {
+  // Extract text fields manually if using FormData, multer handles parsing
   const { patient_id, latitude, longitude, notes } = req.body;
+  const accidentImage = req.file ? `/uploads/accidents/${req.file.filename}` : null;
 
   if (!patient_id || latitude === undefined || longitude === undefined) {
     return res.status(400).json({ success: false, message: 'Patient ID, latitude, and longitude are required.' });
@@ -159,6 +194,70 @@ router.post('/book-ambulance', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Patient not found.' });
     }
 
+    // --- AI Verification Logic ---
+    let verification_status = 'Pending';
+    let verification_reason = 'Analysis in progress...';
+
+    if (req.file) {
+      console.log(`[AI Verification] Image received: ${req.file.path}`);
+
+      try {
+        const imagePath = req.file.path;
+
+        // Resize image for AI (Fix 413 Payload Too Large)
+        console.log('[AI Verification] Resizing image...');
+        // Note: Check if Jimp import is correct. Assuming v0.x based on common usage, but v1 has breaking changes.
+        // If "const { Jimp } = require('jimp')" is used, it might be the class.
+        // Let's assume standard behavior or fix if it errors.
+
+        const image = await Jimp.read(imagePath);
+
+        // Resize to max width 500px, auto height
+        if (image.bitmap.width > 500) {
+          image.resize({ w: 500 });
+        }
+
+        // Compress quality to 50%
+        const resizedBuffer = await image.getBuffer("image/jpeg", { quality: 50 });
+        const base64Image = resizedBuffer.toString('base64');
+        console.log(`[AI Verification] Base64 Image Length: ${base64Image.length} characters`);
+        const dataUrl = `data:image/jpeg;base64,${base64Image}`;
+
+        console.log('[AI Verification] Image resized. Sending request to Azure OpenAI...');
+
+        const response = await client.chat.completions.create({
+          messages: [
+            { role: "system", content: "You are an AI assistant helping emergency services verify accident reports. Analyze the image to determine if it depicts a real vehicle accident, fire, or medical emergency. Result should be strictly JSON format: { \"is_real\": boolean, \"reason\": \"short explanation\" }." },
+            {
+              role: "user", content: [
+                { type: "text", text: "Is this a valid accident scene?" },
+                { type: "image_url", imageUrl: { url: dataUrl, detail: "low" } }
+              ]
+            }
+          ],
+          model: process.env.AZURE_OPENAI_DEPLOYMENT_ID || "gpt-4o",
+          response_format: { type: "json_object" },
+          max_tokens: 150
+        });
+
+        console.log('[AI Verification] Response received.');
+        const result = JSON.parse(response.choices[0].message.content);
+        verification_status = result.is_real ? 'Verified' : 'Suspected Fake';
+        verification_reason = result.reason;
+        console.log(`[AI Verification] Result: ${verification_status} - ${verification_reason}`);
+
+      } catch (aiError) {
+        console.error("AI Verification Failed:", aiError);
+        verification_status = 'Error';
+        verification_reason = 'AI service unavailable: ' + aiError.message;
+      }
+    } else {
+      console.log('[AI Verification] No image file provided.');
+      verification_status = 'No Image';
+      verification_reason = 'No image provided for verification.';
+    }
+    // -----------------------------
+
     const trip_id = `ER-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
     const alert_timestamp = new Date();
     const newTrip = {
@@ -168,16 +267,24 @@ router.post('/book-ambulance', async (req, res) => {
       scene_location_lat: latitude,
       scene_location_lon: longitude,
       patient_name: `${patient.firstName} ${patient.lastName}`,
-      notes,
-      patient_id: patient_id,
+      notes: notes + (accidentImage ? ` [IMAGE_ATTACHED: ${accidentImage}]` : ''), // Append image info to notes for compat
+      patient_id: patient_id, // Keep as string if DB expects it
       booked_by_patient_id: patient_id,
-      alert_timestamp
+      alert_timestamp,
+      trip_image_url: accidentImage,
+      verification_status,
+      verification_reason
     };
 
-    const sql = `INSERT INTO emergencytrips (trip_id, status, alert_source, scene_location_lat, scene_location_lon, patient_name, notes, patient_id, booked_by_patient_id, alert_timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    // Ensure latitude/longitude are numbers
+    const lat = parseFloat(latitude);
+    const lon = parseFloat(longitude);
+
+    const sql = `INSERT INTO emergencytrips (trip_id, status, alert_source, scene_location_lat, scene_location_lon, patient_name, notes, patient_id, booked_by_patient_id, alert_timestamp, trip_image_url, verification_status, verification_reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
     await new Promise((resolve, reject) => {
-      executeQuery(sql, [trip_id, 'New_Alert', 'Patient_App', latitude, longitude, newTrip.patient_name, notes, patient_id, patient_id, alert_timestamp], (err, results) => {
+      // Use newTrip.notes which might include the image tag
+      executeQuery(sql, [trip_id, 'New_Alert', 'Patient_App', lat, lon, newTrip.patient_name, newTrip.notes, patient_id, patient_id, alert_timestamp, accidentImage, verification_status, verification_reason], (err, results) => {
         if (err) return reject(err);
         resolve(results);
       });
@@ -186,14 +293,76 @@ router.post('/book-ambulance', async (req, res) => {
     // Broadcast WebSocket message for the new alert
     broadcast(req.wss, { type: 'NEW_ALERT', payload: newTrip });
 
-    res.status(201).json({ success: true, message: 'Ambulance booked successfully! Help is on the way.', trip_id: trip_id });
+    res.status(201).json({ success: true, message: 'Ambulance booked successfully! Help is on the way.', trip_id: trip_id, verification: { status: verification_status, reason: verification_reason } });
 
     // Trigger auto-dispatch asynchronously
-    autoDispatchTrip(trip_id, { lat: latitude, lon: longitude }, req.wss);
+    autoDispatchTrip(trip_id, { lat: lat, lon: lon }, req.wss);
 
   } catch (error) {
     console.error("Database error booking ambulance:", error);
     res.status(500).json({ success: false, message: 'Failed to book ambulance.' });
+  }
+});
+
+// IoT Alert Endpoint (Automated Crash Detection)
+router.post('/receive-iot-alert', async (req, res) => {
+  const { latitude, longitude, speed, status, deviceId } = req.body;
+
+  if (latitude === undefined || longitude === undefined) {
+    return res.status(400).json({ success: false, message: 'Location data required.' });
+  }
+
+  try {
+    const trip_id = `IOT-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    const alert_timestamp = new Date();
+
+    // Construct automated notes
+    let notes = `[CRASH DETECTED] Speed: ${speed}km/h. Device: ${deviceId}.`;
+    if (status === 'Unconscious' || status === 'Critical') {
+      notes += ` [SEVERE] Driver Status: ${status.toUpperCase()} - IMMEDIATE DISPATCH REQ.`;
+    }
+
+    // Use a placeholder or registered patient ID for the car owner
+    // For this demo, we'll assign it to a "Unknown/IoT" profile or reuse an existing one if needed.
+    // Assuming patient_id 1 is the demo user "John Doe", lets attribute it to him for the demo flow so he sees it on his tracking app?
+    // Or better, leave patient details generic.
+    const patient_name = "Unknown Driver (IoT)";
+    const patient_id = 1; // Demo ID for now to allow tracking on frontend if logged in as user 1
+
+    const newTrip = {
+      trip_id,
+      status: 'New_Alert',
+      alert_source: 'IoT_Sensor',
+      scene_location_lat: latitude,
+      scene_location_lon: longitude,
+      patient_name,
+      notes,
+      patient_id,
+      booked_by_patient_id: patient_id,
+      alert_timestamp
+    };
+
+    const sql = `INSERT INTO emergencytrips (trip_id, status, alert_source, scene_location_lat, scene_location_lon, patient_name, notes, patient_id, booked_by_patient_id, alert_timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+
+    await new Promise((resolve, reject) => {
+      executeQuery(sql, [trip_id, 'New_Alert', 'IoT_Sensor', latitude, longitude, patient_name, notes, patient_id, patient_id, alert_timestamp], (err, results) => {
+        if (err) return reject(err);
+        resolve(results);
+      });
+    });
+
+    broadcast(req.wss, { type: 'NEW_ALERT', payload: newTrip });
+
+    res.status(201).json({ success: true, message: 'IoT Crash Alert Received.', trip_id });
+
+    // Trigger Auto-Dispatch immediately for critical status
+    if (status === 'Unconscious' || status === 'Critical') {
+      autoDispatchTrip(trip_id, { lat: latitude, lon: longitude }, req.wss);
+    }
+
+  } catch (error) {
+    console.error("IoT Alert Error:", error);
+    res.status(500).json({ success: false, message: 'Internal Server Error' });
   }
 });
 
@@ -208,6 +377,7 @@ router.get('/my-trip-status', async (req, res) => {
             SELECT 
                 et.trip_id,
                 et.status,
+                et.trip_image_url,
                 et.assignment_timestamp,
                 et.completion_timestamp,
                 et.eta_minutes,

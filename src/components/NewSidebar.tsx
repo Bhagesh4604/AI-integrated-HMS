@@ -9,7 +9,18 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '../context/ThemeContext';
 
-const SidebarItem = ({ item, isActive, onClick }) => {
+interface SidebarItemProps {
+  item: {
+    id: string;
+    label: string;
+    icon: any;
+    action?: () => void;
+  };
+  isActive: boolean;
+  onClick: () => void;
+}
+
+const SidebarItem: React.FC<SidebarItemProps> = ({ item, isActive, onClick }) => {
   return (
     <motion.button
       whileHover={{ scale: 1.02, x: 4 }}
@@ -39,7 +50,17 @@ const SidebarItem = ({ item, isActive, onClick }) => {
   );
 };
 
-export default function NewSidebar({ activeModule, setActiveModule, userType, onLogout, isSidebarOpen, setSidebarOpen, user }) {
+interface NewSidebarProps {
+  activeModule: string;
+  setActiveModule: (module: string) => void;
+  userType: string;
+  onLogout: () => void;
+  isSidebarOpen: boolean;
+  setSidebarOpen: (isOpen: boolean) => void;
+  user: any;
+}
+
+export default function NewSidebar({ activeModule, setActiveModule, userType, onLogout, isSidebarOpen, setSidebarOpen, user }: NewSidebarProps) {
   const { theme, toggleTheme } = useTheme();
 
   const hospitalAddress = '96GF+GMJ, Tolnoor, Maharashtra 413227';
@@ -135,10 +156,11 @@ export default function NewSidebar({ activeModule, setActiveModule, userType, on
 
       {/* Sidebar Container */}
       <motion.div
-        className={`fixed lg:relative top-0 left-0 h-full z-50 flex flex-col
-                    w-72 lg:w-64 p-4 lg:p-6
-                    ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-                    transition-transform duration-300 ease-in-out lg:bg-transparent perspective-1000`}
+        className={`fixed top-0 left-0 h-full z-50 flex flex-col
+                    transition-all duration-300 ease-in-out lg:bg-transparent perspective-1000
+                    lg:relative lg:translate-x-0
+                    ${isSidebarOpen ? 'translate-x-0 w-72 lg:w-64 px-4 lg:px-6' : '-translate-x-full lg:translate-x-0 lg:w-0 lg:px-0'}
+                    overflow-hidden shadow-2xl lg:shadow-none`}
       >
         {/* Glassmorphism Background (Desktop only usually, but aiming for premium everywhere) */}
         <div className="absolute inset-0 bg-white/60 dark:bg-black/40 backdrop-blur-2xl border-r border-white/20 dark:border-white/5 shadow-[20px_0_50px_rgba(0,0,0,0.1)] lg:rounded-r-3xl" />
@@ -167,9 +189,13 @@ export default function NewSidebar({ activeModule, setActiveModule, userType, on
                 item={item}
                 isActive={activeModule === item.id}
                 onClick={() => {
-                  if (item.action) item.action();
+                  const itemWithAction = item as { action?: () => void; id: string };
+                  if (itemWithAction.action) itemWithAction.action();
                   else setActiveModule(item.id);
-                  setSidebarOpen(false);
+                  // Only auto-close on mobile
+                  if (window.innerWidth < 1024) {
+                    setSidebarOpen(false);
+                  }
                 }}
               />
             ))}

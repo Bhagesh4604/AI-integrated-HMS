@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import apiUrl from '@/config/api';
 import useWebSocket from '../hooks/useWebSocket';
 import MapView from '../components/ems/MapView';
-import { Sparkles, HeartPulse, Gauge, Siren, ChevronDown, Activity, MapPin } from 'lucide-react';
+import { Sparkles, HeartPulse, Gauge, Siren, ChevronDown, Activity, MapPin, Camera, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '../context/ThemeContext';
 
@@ -124,26 +124,69 @@ const TripCard = ({ trip, acuity, isGeneratingAcuity }) => {
                   )}
                 </div>
 
-                {/* AI Assessment Column */}
-                <div className="lg:col-span-2 space-y-2">
+                {/* AI Assessment & Photo Column */}
+                <div className="lg:col-span-2 space-y-4">
                   <div className="flex items-center justify-between">
                     <h4 className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2">
-                      <Sparkles size={14} className="text-purple-500" /> AI Triage Insights
+                      <Sparkles size={14} className="text-purple-500" /> AI Triage & Scene
                     </h4>
                     {isGeneratingAcuity && <span className="text-xs text-purple-500 animate-pulse font-bold">Analyzing...</span>}
                   </div>
 
-                  <div className="p-5 rounded-2xl bg-gradient-to-br from-purple-500/5 to-blue-500/5 border border-purple-500/10 min-h-[140px] relative overflow-hidden">
-                    {acuity ? (
-                      <div className="relative z-10 text-sm text-gray-700 dark:text-gray-300 font-medium leading-relaxed whitespace-pre-wrap">
-                        {acuity}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* AI Triage Card */}
+                    <div className="p-5 rounded-2xl bg-gradient-to-br from-purple-500/5 to-blue-500/5 border border-purple-500/10 min-h-[140px] relative overflow-hidden">
+                      {acuity ? (
+                        <div className="relative z-10 text-sm text-gray-700 dark:text-gray-300 font-medium leading-relaxed whitespace-pre-wrap">
+                          {acuity}
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                          <p className="text-sm">Awaiting sufficient data for analysis.</p>
+                        </div>
+                      )}
+                      <div className="absolute -right-10 -bottom-10 w-32 h-32 bg-purple-500/10 blur-2xl rounded-full pointer-events-none"></div>
+                    </div>
+
+                    {/* Scene Photo Card */}
+                    {trip.trip_image_url ? (
+                      <div className="relative group rounded-2xl overflow-hidden border border-white/10 h-[140px] bg-black/50">
+                        <img
+                          src={apiUrl(trip.trip_image_url)}
+                          alt="Scene"
+                          className="w-full h-full object-contain bg-black/50 opacity-90 group-hover:opacity-100 transition-opacity cursor-pointer"
+                          onClick={() => window.open(apiUrl(trip.trip_image_url), '_blank')}
+                        />
+                        <div className="absolute top-2 right-2">
+                          {trip.verification_status === 'Verified' && (
+                            <span className="px-2 py-1 rounded-full bg-green-500/80 text-white text-[10px] font-bold backdrop-blur-sm border border-green-400/30 flex items-center gap-1">
+                              <ShieldCheck size={10} /> Verified
+                            </span>
+                          )}
+                          {trip.verification_status === 'Suspected Fake' && (
+                            <span className="px-2 py-1 rounded-full bg-red-500/80 text-white text-[10px] font-bold backdrop-blur-sm border border-red-400/30 flex items-center gap-1">
+                              <AlertTriangle size={10} /> Suspected Fake
+                            </span>
+                          )}
+                          {trip.verification_status === 'Error' && (
+                            <span className="px-2 py-1 rounded-full bg-gray-600/80 text-white text-[10px] font-bold backdrop-blur-sm border border-gray-400/30 flex items-center gap-1">
+                              <AlertTriangle size={10} /> AI Unavailable
+                            </span>
+                          )}
+                        </div>
+                        <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/80 to-transparent pointer-events-none">
+                          <span className="text-xs font-bold text-white flex items-center gap-1"><Camera size={12} /> Accident Scene</span>
+                          {trip.verification_reason && (
+                            <p className="text-[10px] text-gray-300 leading-tight mt-1 truncate">{trip.verification_reason}</p>
+                          )}
+                        </div>
                       </div>
                     ) : (
-                      <div className="flex flex-col items-center justify-center h-full text-gray-400">
-                        <p className="text-sm">Awaiting sufficient data for analysis.</p>
+                      <div className="rounded-2xl border border-white/5 bg-white/5 h-[140px] flex flex-col items-center justify-center text-gray-500">
+                        <Camera size={24} className="opacity-20 mb-2" />
+                        <span className="text-xs">No scene photo</span>
                       </div>
                     )}
-                    <div className="absolute -right-10 -bottom-10 w-32 h-32 bg-purple-500/10 blur-2xl rounded-full pointer-events-none"></div>
                   </div>
                 </div>
 
