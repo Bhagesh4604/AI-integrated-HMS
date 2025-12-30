@@ -60,6 +60,15 @@ const MainApplication = ({ user, onLogout, updateUser }) => {
     }
   };
 
+  // Listen for Voice Commands
+  useEffect(() => {
+    const handleVoiceNav = (e: any) => {
+      if (e.detail) setActiveModule(e.detail);
+    };
+    window.addEventListener('switch-module', handleVoiceNav);
+    return () => window.removeEventListener('switch-module', handleVoiceNav);
+  }, []);
+
   const renderModule = () => {
     const isAdmin = user.role === 'admin';
     const isDoctor = user.role === 'doctor';
@@ -120,6 +129,8 @@ const MainApplication = ({ user, onLogout, updateUser }) => {
   );
 };
 
+import VoiceController from './components/VoiceController';
+
 // --- Root App Component ---
 function App() {
   const [loggedInUser, setLoggedInUser] = useState(null);
@@ -175,79 +186,82 @@ function App() {
   };
 
   return (
-    <Routes>
-      {/* Public Routes */}
-      <Route path="/" element={loggedInUser ? <Navigate to="/staff-dashboard" /> : <LandingPage />} />
-      <Route path="/login/staff" element={<StaffLogin onLogin={handleLogin} />} />
-      <Route path="/login/patient" element={<PatientAuthPage onLogin={handleLogin} />} />
-      <Route path="/register/patient" element={<PatientRegister />} />
-      <Route path="/forgot-password" element={<ForgotPassword />} />
-      <Route path="/reset-password" element={<ResetPassword />} />
+    <>
+      <VoiceController />
+      <Routes>
+        {/* Public Routes */}
+        <Route path="/" element={loggedInUser ? <Navigate to="/staff-dashboard" /> : <LandingPage />} />
+        <Route path="/login/staff" element={<StaffLogin onLogin={handleLogin} />} />
+        <Route path="/login/patient" element={<PatientAuthPage onLogin={handleLogin} />} />
+        <Route path="/register/patient" element={<PatientRegister />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
-      {/* Protected Routes */}
-      <Route
-        path="/staff-dashboard"
-        element={
-          <ProtectedRoute user={loggedInUser} allowedRoles={['admin', 'doctor']}>
-            <MainApplication user={loggedInUser} onLogout={handleLogout} updateUser={updateLoggedInUser} />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/patient-dashboard"
-        element={
-          <ProtectedRoute user={loggedInUser} allowedRoles={['patient']}>
-            <PatientDashboard patient={loggedInUser} onLogout={handleLogout} updateUser={updateLoggedInUser} />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/patient/book-ambulance"
-        element={
-          <ProtectedRoute user={loggedInUser} allowedRoles={['patient']}>
-            <BookAmbulance user={loggedInUser} />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/patient/track-ambulance/:tripId"
-        element={
-          <ProtectedRoute user={loggedInUser} allowedRoles={['patient']}>
-            <TrackAmbulance user={loggedInUser} />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/fleet-management"
-        element={
-          <ProtectedRoute user={loggedInUser} allowedRoles={['ROLE_DISPATCHER', 'admin']}>
-            <EmsLayout user={loggedInUser} onLogout={handleLogout}>
-              <FleetManagementDashboard />
-            </EmsLayout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/paramedic-mode"
-        element={
-          <ProtectedRoute user={loggedInUser} allowedRoles={['ROLE_PARAMEDIC']}>
-            <EmsLayout user={loggedInUser} onLogout={handleLogout}>
-              <ParamedicMode user={loggedInUser} />
-            </EmsLayout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/er-dashboard"
-        element={
-          <ProtectedRoute user={loggedInUser} allowedRoles={['ROLE_ER_STAFF', 'admin']}>
-            <EmsLayout user={loggedInUser} onLogout={handleLogout}>
-              <ERDashboard />
-            </EmsLayout>
-          </ProtectedRoute>
-        }
-      />
-    </Routes>
+        {/* Protected Routes */}
+        <Route
+          path="/staff-dashboard"
+          element={
+            <ProtectedRoute user={loggedInUser} allowedRoles={['admin', 'doctor']}>
+              <MainApplication user={loggedInUser} onLogout={handleLogout} updateUser={updateLoggedInUser} />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/patient-dashboard"
+          element={
+            <ProtectedRoute user={loggedInUser} allowedRoles={['patient']}>
+              <PatientDashboard patient={loggedInUser} onLogout={handleLogout} updateUser={updateLoggedInUser} />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/patient/book-ambulance"
+          element={
+            <ProtectedRoute user={loggedInUser} allowedRoles={['patient']}>
+              <BookAmbulance user={loggedInUser} />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/patient/track-ambulance/:tripId"
+          element={
+            <ProtectedRoute user={loggedInUser} allowedRoles={['patient']}>
+              <TrackAmbulance user={loggedInUser} />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/fleet-management"
+          element={
+            <ProtectedRoute user={loggedInUser} allowedRoles={['ROLE_DISPATCHER', 'admin']}>
+              <EmsLayout user={loggedInUser} onLogout={handleLogout}>
+                <FleetManagementDashboard />
+              </EmsLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/paramedic-mode"
+          element={
+            <ProtectedRoute user={loggedInUser} allowedRoles={['ROLE_PARAMEDIC']}>
+              <EmsLayout user={loggedInUser} onLogout={handleLogout}>
+                <ParamedicMode user={loggedInUser} />
+              </EmsLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/er-dashboard"
+          element={
+            <ProtectedRoute user={loggedInUser} allowedRoles={['ROLE_ER_STAFF', 'admin']}>
+              <EmsLayout user={loggedInUser} onLogout={handleLogout}>
+                <ERDashboard />
+              </EmsLayout>
+            </ProtectedRoute>
+          }
+        />
+      </Routes>
+    </>
   );
 }
 

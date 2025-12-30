@@ -5,6 +5,7 @@ import { Users, Stethoscope, Bed, DollarSign, TrendingUp, Scissors, Sun, Moon, A
 import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
 import LanguageSwitcher from './LanguageSwitcher';
+import EmergencyAlertWidget from './EmergencyAlertWidget';
 import apiUrl from '@/config/api';
 
 // --- 3D Stat Card Component ---
@@ -195,6 +196,7 @@ export default function Dashboard({ setActiveModule }) {
 
   return (
     <div className="min-h-screen p-4 sm:p-8 font-sans transition-colors duration-300 bg-background text-foreground">
+      <EmergencyAlertWidget />
       <div>
         {/* --- HEADER --- */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-10">

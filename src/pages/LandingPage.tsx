@@ -1,19 +1,20 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { motion, useMotionTemplate, useMotionValue, animate } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import ThreeBackground from '@/components/landing/ThreeBackground';
 import {
-  Calendar, 
-  Code, 
-  FileText, 
-  User, 
-  Clock, 
-  Sparkles, 
-  Moon, 
-  Sun, 
-  MapPin, 
-  Phone, 
-  Mail, 
-  Users as UsersIcon, 
+  Calendar,
+  Code,
+  FileText,
+  User,
+  Clock,
+  Sparkles,
+  Moon,
+  Sun,
+  MapPin,
+  Phone,
+  Mail,
+  Users as UsersIcon,
   Shield,
   Video
 } from 'lucide-react';
@@ -32,7 +33,7 @@ import RadialOrbitalTimeline from '@/components/ui/radial-orbital-timeline';
 export default function LandingPage() {
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
-  const [selectedCity, setSelectedCity] = useState(null);
+  const [selectedCity, setSelectedCity] = useState<any>(null);
   const heroRef = useRef<HTMLDivElement>(null);
   const [showTriageModal, setShowTriageModal] = useState(false);
 
@@ -101,25 +102,15 @@ export default function LandingPage() {
     },
   ];
 
-  const COLORS_TOP = ["#60a5fa", "#3b82f6", "#a78bfa", "#8b5cf6", "#ec4899"];
-  const color = useMotionValue(COLORS_TOP[0]);
 
-  useEffect(() => {
-    animate(color, COLORS_TOP, {
-      ease: 'easeInOut',
-      duration: 10,
-      repeat: Infinity,
-      repeatType: 'mirror',
-    });
-  }, []);
 
-  const backgroundImage = useMotionTemplate`radial-gradient(125% 125% at 50% 0%, ${theme === 'dark' ? '#020617' : '#f8fafc'} 50%, ${color})`;
+
 
   const scrollToFeatures = () => {
     document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' });
   };
-  
-    const cities = [
+
+  const cities = [
     { name: 'Mumbai', address: '123 Marine Drive, Mumbai, Maharashtra 400001', phone: '+91 22 1234 5678' },
     { name: 'Delhi', address: '456 Connaught Place, New Delhi 110001', phone: '+91 11 8765 4321' },
     { name: 'Bangalore', address: '789 MG Road, Bangalore, Karnataka 560001', phone: '+91 80 9876 5432' },
@@ -137,11 +128,11 @@ export default function LandingPage() {
         >
           {theme === 'light' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
         </Button>
+        <ThreeBackground />
 
         <motion.section
           ref={heroRef}
-          style={{ backgroundImage }}
-          className="relative min-h-screen flex items-center justify-center overflow-hidden p-4"
+          className="relative min-h-screen flex items-center justify-center overflow-hidden p-4 z-10"
         >
           <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
             <motion.div
@@ -155,15 +146,15 @@ export default function LandingPage() {
                 <Sparkles className="w-4 h-4 mr-2" />
                 Powered by AI & Innovation
               </Badge>
-              
+
               <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold tracking-tight">
                 Shree Medicare: The Future of Healing
               </h1>
-              
+
               <p className="text-lg sm:text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto">
                 Combining Compassionate Care with Cutting-Edge Technology
               </p>
-              
+
               <div className="flex flex-wrap justify-center gap-4 mt-8">
                 <GradientButton onClick={scrollToFeatures}>
                   Discover Our Services
@@ -184,111 +175,111 @@ export default function LandingPage() {
 
         <RadialOrbitalTimeline timelineData={timelineData} />
 
-        <motion.section className="py-24 bg-muted/50 relative overflow-hidden">
-            <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6 }}
-                viewport={{ once: true }}
-                className="text-center mb-16"
-              >
-                <h2 className="text-4xl md:text-5xl font-bold mb-4">
-                  Our Location
-                </h2>
-                <p className="text-xl text-muted-foreground">
-                  Find us at our prime location
-                </p>
-              </motion.div>
+        <motion.section className="py-24 bg-muted/50 dark:bg-black/20 backdrop-blur-sm relative overflow-hidden z-10">
+          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+              viewport={{ once: true }}
+              className="text-center mb-16"
+            >
+              <h2 className="text-4xl md:text-5xl font-bold mb-4">
+                Our Location
+              </h2>
+              <p className="text-xl text-muted-foreground">
+                Find us at our prime location
+              </p>
+            </motion.div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-                <div className="h-[500px] rounded-lg overflow-hidden bg-card border border-border">
-                  <img src="/India.jpg" alt="Map of Shree Medicare locations in India" className="w-full h-full object-cover" />
-                </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+              <div className="h-[500px] rounded-lg overflow-hidden bg-card border border-border">
+                <img src="/India.jpg" alt="Map of Shree Medicare locations in India" className="w-full h-full object-cover" />
+              </div>
 
-                <div className="space-y-6">
-                    <motion.div
-                      initial={{ opacity: 0, x: 20 }}
-                      whileInView={{ opacity: 1, x: 0 }}
-                      transition={{ duration: 0.6 }}
-                      viewport={{ once: true }}
-                    >
-                      <Card className="backdrop-blur-sm bg-card/50 border-border">
-                        <CardHeader>
-                          <CardTitle className="flex items-center">
-                            <MapPin className="w-5 h-5 mr-2 text-primary" />
-                            Shree Medicare Hospital
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                          <p className="text-sm text-muted-foreground flex items-start">
-                            <Mail className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
-                            96GF+GMJ, Tolnoor, Maharashtra 413227
-                          </p>
-                          <p className="text-sm text-muted-foreground flex items-center">
-                            <Phone className="w-4 h-4 mr-2" />
-                            +917483159830 
-                          </p>
-                          <GradientButton
-                            onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent('96GF+GMJ, Tolnoor, Maharashtra 413227')}`, '_blank')}
-                          >
-                            Get Directions
-                          </GradientButton>
-                        </CardContent>
-                      </Card>
-                    </motion.div>
-                </div>
+              <div className="space-y-6">
+                <motion.div
+                  initial={{ opacity: 0, x: 20 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.6 }}
+                  viewport={{ once: true }}
+                >
+                  <Card className="backdrop-blur-sm bg-card/50 border-border">
+                    <CardHeader>
+                      <CardTitle className="flex items-center">
+                        <MapPin className="w-5 h-5 mr-2 text-primary" />
+                        Shree Medicare Hospital
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <p className="text-sm text-muted-foreground flex items-start">
+                        <Mail className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
+                        96GF+GMJ, Tolnoor, Maharashtra 413227
+                      </p>
+                      <p className="text-sm text-muted-foreground flex items-center">
+                        <Phone className="w-4 h-4 mr-2" />
+                        +917483159830
+                      </p>
+                      <GradientButton
+                        onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent('96GF+GMJ, Tolnoor, Maharashtra 413227')}`, '_blank')}
+                      >
+                        Get Directions
+                      </GradientButton>
+                    </CardContent>
+                  </Card>
+                </motion.div>
               </div>
             </div>
-          </motion.section>
+          </div>
+        </motion.section>
 
-        <motion.section id="portals" className="py-24 bg-background relative overflow-hidden">
-            <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6 }}
-                viewport={{ once: true }}
-                className="text-center mb-16"
-              >
-                <h2 className="text-4xl md:text-5xl font-bold mb-4">
-                  Access Your Portal
-                </h2>
-                <p className="text-xl text-muted-foreground">
-                  Choose your portal to get started
-                </p>
-              </motion.div>
+        <motion.section id="portals" className="py-24 relative overflow-hidden z-10">
+          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+              viewport={{ once: true }}
+              className="text-center mb-16"
+            >
+              <h2 className="text-4xl md:text-5xl font-bold mb-4">
+                Access Your Portal
+              </h2>
+              <p className="text-xl text-muted-foreground">
+                Choose your portal to get started
+              </p>
+            </motion.div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-                 <AnimatedPortalCard 
-                  title="Patient Portal"
-                  description="Access your medical records, book appointments, and manage your healthcare journey."
-                  icon={UsersIcon}
-                  onClick={() => navigate('/login/patient')}
-                  gradientColors={["#3b82f6", "#a855f7"]}
-                />
-                <AnimatedPortalCard 
-                  title="Staff Portal"
-                  description="Manage patient records, appointments, billing, and hospital operations efficiently."
-                  icon={Shield}
-                  onClick={() => navigate('/login/staff')}
-                  gradientColors={["#10b980", "#06b6d4"]}
-                />
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+              <AnimatedPortalCard
+                title="Patient Portal"
+                description="Access your medical records, book appointments, and manage your healthcare journey."
+                icon={UsersIcon}
+                onClick={() => navigate('/login/patient')}
+                gradientColors={["#3b82f6", "#a855f7"]}
+              />
+              <AnimatedPortalCard
+                title="Staff Portal"
+                description="Manage patient records, appointments, billing, and hospital operations efficiently."
+                icon={Shield}
+                onClick={() => navigate('/login/staff')}
+                gradientColors={["#10b980", "#06b6d4"]}
+              />
             </div>
-          </motion.section>
+          </div>
+        </motion.section>
 
-        <footer className="py-6 bg-background border-t border-border">
+        <footer className="py-6 border-t border-border/50 bg-background/50 backdrop-blur-md relative z-10">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-muted-foreground">
             <p className="text-sm">&copy; 2025 Shree Medicare . All Rights Reserved. Designed & Developed by 🤍 Bhagesh Biradar.</p>
           </div>
         </footer>
 
         <Dialog open={!!selectedCity} onOpenChange={() => setSelectedCity(null)}>
-            <DialogContent>
-                <DialogTitle>Shree Medicare - {selectedCity?.name}</DialogTitle>
-                <p>Details for {selectedCity?.name} hospital would be shown here.</p>
-            </DialogContent>
+          <DialogContent>
+            <DialogTitle>Shree Medicare - {selectedCity?.name}</DialogTitle>
+            <p>Details for {selectedCity?.name} hospital would be shown here.</p>
+          </DialogContent>
         </Dialog>
 
         {showTriageModal && <TriageChatModal onClose={() => setShowTriageModal(false)} />}

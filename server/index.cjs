@@ -129,6 +129,9 @@ app.use('/api/triage', require('./triage.cjs'));
 app.use('/api/beds', require('./beds.cjs'));
 app.use('/api/ems', require('./ems.cjs')); // New EMS routes
 app.use('/api/ems/patient', require('./ems_patient.cjs')); // New Patient-facing EMS routes
+app.use('/api/speech', require('./speechToken.cjs')); // Azure Speech Token
+app.use('/api/agent', require('./agentService.cjs')); // NEW AI AGENT
+app.use('/api/health', require('./healthCheck.cjs')); // Health Check logic
 
 // === Phase 3: Blockchain & Analytics ===
 const { medicareChain, Block } = require('./blockchainService.cjs');

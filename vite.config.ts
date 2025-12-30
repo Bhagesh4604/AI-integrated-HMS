@@ -15,6 +15,15 @@ export default defineConfig(({ mode }) => {
     define: {
       'import.meta.env.VITE_API_BASE': JSON.stringify(env.VITE_API_BASE)
     },
+    server: {
+      proxy: {
+        '/api': {
+          target: 'http://localhost:8080',
+          changeOrigin: true,
+          secure: false,
+        }
+      }
+    },
     build: {
       rollupOptions: {
         external: []

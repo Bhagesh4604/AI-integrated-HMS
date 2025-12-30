@@ -3,6 +3,9 @@ const router = express.Router();
 const { pool, executeQuery } = require('./db.cjs');
 const WebSocket = require('ws');
 const fetch = require('node-fetch'); // Import node-fetch
+const multer = require('multer');
+const upload = multer({ storage: multer.memoryStorage() });
+const { AzureOpenAI, OpenAI } = require("openai");
 
 // Helper function to broadcast to all clients
 const broadcast = (wss, data) => {
@@ -1078,6 +1081,214 @@ router.get('/paramedic/trip-history', (req, res) => {
     }
     res.json({ success: true, trips: results });
   });
+});
+
+// Get Live Emergency Alerts (for Red Alert Widget)
+router.get('/live-alerts', (req, res) => {
+  const sql = `
+    SELECT 
+      et.trip_id,
+      et.patient_name,
+      et.eta_minutes,
+      et.alert_timestamp,
+      et.scene_location_lat,
+      et.scene_location_lon,
+      et.notes,
+      atl.ai_notes,
+      atl.recommended_specialist
+    FROM emergencytrips et
+    LEFT JOIN ai_triage_logs atl ON et.trip_id = atl.trip_id
+    WHERE et.status IN ('New_Alert', 'Assigned', 'En_Route_To_Scene')
+    ORDER BY et.alert_timestamp DESC
+    LIMIT 1
+  `;
+  
+  executeQuery(sql, [], (err, results) => {
+    if (err) {
+      console.error("Database error fetching live alerts:", err);
+      return res.status(500).json({ success: false, message: 'Failed to fetch live alerts.' });
+    }
+    res.json({ success: true, alerts: results || [] });
+  });
+});
+
+// Analyze Crash Photo with Azure OpenAI GPT-4o
+function getOpenAIClient() {
+  const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
+  const apiKey = process.env.AZURE_OPENAI_API_KEY;
+  const deploymentId = process.env.AZURE_OPENAI_DEPLOYMENT_ID || "gpt-4o";
+
+  if (!endpoint || !apiKey) {
+    console.error("Azure OpenAI credentials missing");
+    return null;
+  }
+
+  // Check if using GitHub Models (Azure AI Inference)
+  if (endpoint.includes("inference.ai.azure.com")) {
+    return {
+      client: new OpenAI({
+        baseURL: endpoint,
+        apiKey: apiKey
+      }),
+      isGitHub: true,
+      modelName: deploymentId
+    };
+  }
+
+  // Default: Azure OpenAI Service
+  const apiVersion = "2024-05-01-preview";
+  return {
+    client: new AzureOpenAI({ endpoint, apiKey, apiVersion, deployment: deploymentId }),
+    isGitHub: false,
+    modelName: ""
+  };
+}
+
+router.post('/analyze-photo', upload.single('crash_image'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ success: false, message: 'No image file uploaded. Field name must be "crash_image".' });
+  }
+
+  try {
+    // Convert image buffer to Base64
+    const imageBase64 = req.file.buffer.toString('base64');
+    const imageMimeType = req.file.mimetype || 'image/jpeg';
+    const imageDataUrl = `data:${imageMimeType};base64,${imageBase64}`;
+
+    // Get Azure OpenAI client
+    const wrapper = getOpenAIClient();
+    if (!wrapper || !wrapper.client) {
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Azure OpenAI service is not configured.' 
+      });
+    }
+
+    // System prompt for crash analysis
+    const systemPrompt = `You are an expert medical AI assistant analyzing crash/accident images for a hospital emergency department. 
+    Analyze the image carefully and identify:
+    1. Visible injuries (blood, burns, fractures, lacerations)
+    2. Vehicle damage severity
+    3. Potential trauma indicators
+    
+    Return ONLY a valid JSON object with this exact structure:
+    {
+      "severity": "CRITICAL" | "HIGH" | "MEDIUM" | "LOW",
+      "injury_risk": "High" | "Medium" | "Low",
+      "notes": "Detailed description of visible injuries and damage",
+      "recommended_specialist": "Trauma Surgeon" | "Orthopedic Surgeon" | "General Surgeon" | "Emergency Medicine" | "Other specialist name"
+    }
+    
+    Be thorough but concise. If you cannot clearly see injuries, indicate uncertainty.`;
+
+    // Prepare messages for vision-capable model
+    const messages = [
+      {
+        role: "system",
+        content: systemPrompt
+      },
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: "Analyze this crash image. Identify visible injuries (blood, burns) and vehicle damage. Return JSON with severity, injury_risk, notes, and recommended_specialist fields."
+          },
+          {
+            type: "image_url",
+            image_url: {
+              url: imageDataUrl
+            }
+          }
+        ]
+      }
+    ];
+
+    // Call Azure OpenAI with vision support
+    let aiResponse;
+    try {
+      const result = await wrapper.client.chat.completions.create({
+        model: wrapper.isGitHub ? wrapper.modelName : "gpt-4o",
+        messages: messages,
+        max_tokens: 500
+      });
+      aiResponse = result.choices[0].message.content;
+    } catch (aiError) {
+      console.error("Azure OpenAI API error:", aiError);
+      return res.status(500).json({ 
+        success: false, 
+        message: `AI analysis failed: ${aiError.message}` 
+      });
+    }
+
+    // Parse AI response (may be JSON or text with JSON)
+    let analysisResult;
+    try {
+      // Try to extract JSON from response
+      const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        analysisResult = JSON.parse(jsonMatch[0]);
+      } else {
+        analysisResult = JSON.parse(aiResponse);
+      }
+    } catch (parseError) {
+      console.error("Failed to parse AI response:", aiResponse);
+      // Fallback structure
+      analysisResult = {
+        severity: "HIGH",
+        injury_risk: "High",
+        notes: aiResponse || "AI analysis completed but response format was unexpected.",
+        recommended_specialist: "Trauma Surgeon"
+      };
+    }
+
+    // Ensure required fields exist
+    if (!analysisResult.severity) analysisResult.severity = "HIGH";
+    if (!analysisResult.injury_risk) analysisResult.injury_risk = "High";
+    if (!analysisResult.notes) analysisResult.notes = "Image analyzed but no specific findings noted.";
+    if (!analysisResult.recommended_specialist) analysisResult.recommended_specialist = "Emergency Medicine";
+
+    // Save to ai_triage_logs table
+    const tripId = req.body.trip_id || `TRIP-${Date.now()}`;
+    const insertSql = `
+      INSERT INTO ai_triage_logs 
+      (trip_id, ai_notes, recommended_specialist, severity, injury_risk, analysis_timestamp)
+      VALUES (?, ?, ?, ?, ?, NOW())
+    `;
+
+    executeQuery(
+      insertSql,
+      [
+        tripId,
+        analysisResult.notes,
+        analysisResult.recommended_specialist,
+        analysisResult.severity,
+        analysisResult.injury_risk
+      ],
+      (err, result) => {
+        if (err) {
+          console.error("Database error saving AI triage log:", err);
+          // Still return the analysis even if DB save fails
+        } else {
+          console.log("AI triage log saved successfully:", result.insertId);
+        }
+      }
+    );
+
+    // Return the analysis result
+    res.json({
+      success: true,
+      analysis: analysisResult,
+      trip_id: tripId
+    });
+
+  } catch (error) {
+    console.error("Error analyzing crash photo:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: `Failed to analyze photo: ${error.message}` 
+    });
+  }
 });
 
 
